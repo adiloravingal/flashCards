@@ -1,0 +1,60 @@
+# ---------------------------------------------------------------------------
+# Your data. Never commit this.
+#
+# `data/` holds the SQLite database, every uploaded image and audio file, and
+# `agent-key.txt` — the key that grants full read/write access to the API.
+# It is also the only folder you need to back up.
+# ---------------------------------------------------------------------------
+data/
+
+# Decks and backups you export. These are your cards, not source code.
+*.fcdeck
+*.apkg
+flashcards-backup-*.json
+
+# ---------------------------------------------------------------------------
+# Secrets and local configuration
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# TLS certificates, if you ever put this behind HTTPS on the home server.
+*.pem
+*.key
+*.crt
+
+# Claude Code's per-machine settings. `launch.json` is shared project config
+# and is deliberately left tracked.
+.claude/settings.local.json
+
+# ---------------------------------------------------------------------------
+# Build output and dependencies
+# ---------------------------------------------------------------------------
+node_modules/
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# ---------------------------------------------------------------------------
+# Logs and scratch
+# ---------------------------------------------------------------------------
+*.log
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ---------------------------------------------------------------------------
+# Editor and OS noise
+# ---------------------------------------------------------------------------
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo

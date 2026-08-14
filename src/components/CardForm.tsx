@@ -1,0 +1,511 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { api, cx } from "@/lib/client";
+import { clozeIndices, renderCloze, wrapSelection } from "@/lib/cloze";
+import type { Card, Chapter, Course } from "@/lib/types";
+import {
+  MediaAttachments,
+  toAttachments,
+  useAttachmentUpload,
+  type Attachment,
+} from "./MediaAttachments";
+import { MediaTextarea } from "./MediaTextarea";
+import { Button, Icon } from "./ui";
+
+export interface CardDraft {
+  front: string;
+  back: string;
+  hint: string;
+  notes: string;
+  tags: string[];
+  starred: boolean;
+  attachments: Attachment[];
+  chapterId: string;
+}
+
+export const emptyDraft = (chapterId = ""): CardDraft => ({
+  front: "",
+  back: "",
+  hint: "",
+  notes: "",
+  tags: [],
+  starred: false,
+  attachments: [],
+  chapterId,
+});
+
+export const draftFromCard = (card: Card): CardDraft => ({
+  front: card.front,
+  back: card.back,
+  hint: card.hint,
+  notes: card.notes,
+  tags: card.tags,
+  starred: !!card.starred,
+  attachments: toAttachments(card.media),
+  chapterId: card.chapter_id,
+});
+
+/** Remembers the last chapter you wrote into, so the next card needs no setup. */
+const LAST_CHAPTER_KEY = "fc-last-chapter";
+export const rememberChapter = (id: string) => {
+  try {
+    localStorage.setItem(LAST_CHAPTER_KEY, id);
+  } catch {
+    /* ignore */
+  }
+};
+export const recallChapter = (): string => {
+  try {
+    return localStorage.getItem(LAST_CHAPTER_KEY) ?? "";
+  } catch {
+    return "";
+  }
+};
+
+type CourseWithCounts = Course & { totalCards: number };
+
+/**
+ * The single card editor, shared by the quick-add modal, the full Add page and
+ * inline editing during review. Optional fields stay collapsed until asked for:
+ * the default state is two boxes and nothing else.
+ */
+export function CardForm({
+  draft,
+  onChange,
+  autoFocus = true,
+  showChapterPicker = true,
+  onSubmit,
+}: {
+  draft: CardDraft;
+  onChange: (next: CardDraft) => void;
+  autoFocus?: boolean;
+  showChapterPicker?: boolean;
+  onSubmit?: () => void;
+}) {
+  const [showMore, setShowMore] = useState(
+    !!(draft.hint || draft.notes || draft.tags.length),
+  );
+  const [tagInput, setTagInput] = useState("");
+  const frontRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (autoFocus) frontRef.current?.focus();
+  }, [autoFocus]);
+
+  const set = <K extends keyof CardDraft>(key: K, value: CardDraft[K]) =>
+    onChange({ ...draft, [key]: value });
+
+  // An upload started from a paste can land while the user keeps typing, so
+  // attachments must merge into whatever the draft looks like *then*, not the
+  // version captured when the paste happened.
+  const draftRef = useRef(draft);
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
+  const setAttachments = (next: Attachment[]) =>
+    onChange({ ...draftRef.current, attachments: next });
+
+  const front = useAttachmentUpload({
+    attachments: draft.attachments,
+    onChange: setAttachments,
+    side: "front",
+  });
+  const back = useAttachmentUpload({
+    attachments: draft.attachments,
+    onChange: setAttachments,
+    side: "back",
+  });
+
+  const commitTag = () => {
+    const t = tagInput.trim().toLowerCase().replace(/\s+/g, "-");
+    if (t && !draft.tags.includes(t)) set("tags", [...draft.tags, t]);
+    setTagInput("");
+  };
+
+  // ⌘/Ctrl+Enter saves from anywhere in the form.
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      onSubmit?.();
+    }
+  };
+
+  /**
+   * Turn the selected words into the next deletion. Without this, cloze means
+   * hand-typing `{{c1::}}` around text, which is enough friction that nobody
+   * uses the feature.
+   */
+  const makeCloze = () => {
+    const el = frontRef.current;
+    if (!el) return;
+    const result = wrapSelection(draft.front, el.selectionStart, el.selectionEnd);
+    if (!result) return;
+    set("front", result.text);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(result.cursor, result.cursor);
+    });
+  };
+
+  const onFrontKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "c") {
+      e.preventDefault();
+      makeCloze();
+    }
+  };
+
+  const indices = clozeIndices(draft.front);
+  const isCloze = indices.length > 0;
+
+  return (
+    <div className="space-y-4" onKeyDown={onKeyDown}>
+      {showChapterPicker && (
+        <ChapterPicker
+          value={draft.chapterId}
+          onChange={(id) => {
+            set("chapterId", id);
+            rememberChapter(id);
+          }}
+        />
+      )}
+
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <label
+            htmlFor="card-front"
+            className="text-[13px] font-medium text-[var(--text-muted)]"
+          >
+            Front
+          </label>
+          <button
+            type="button"
+            onClick={() => set("starred", !draft.starred)}
+            aria-pressed={draft.starred}
+            title="Star this card"
+            className={cx(
+              "transition-colors",
+              draft.starred
+                ? "text-[var(--hard)]"
+                : "text-[var(--text-faint)] hover:text-[var(--text-muted)]",
+            )}
+          >
+            <Icon
+              name="star"
+              className="w-4 h-4"
+              strokeWidth={draft.starred ? 2 : 1.7}
+            />
+          </button>
+        </div>
+        <MediaTextarea
+          id="card-front"
+          ref={frontRef}
+          value={draft.front}
+          onChange={(e) => set("front", e.target.value)}
+          onKeyDown={onFrontKeyDown}
+          onFiles={front.upload}
+          uploading={front.uploading}
+          hint="front"
+          placeholder="The question, term, or prompt — paste an image or drop a file right here"
+          rows={2}
+          className="field"
+        />
+
+        {/* Cloze affordance: a button when there's nothing yet, a plain
+            statement of consequence once there is. */}
+        <div className="flex items-center gap-2 mt-1.5 min-h-[1.25rem]">
+          <button
+            type="button"
+            onClick={makeCloze}
+            title="Select text first, then blank it out"
+            className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
+          >
+            <Icon name="edit" className="w-3.5 h-3.5" />
+            Blank out selection
+            <span className="kbd ml-0.5">⌘⇧C</span>
+          </button>
+          {isCloze && (
+            <span className="text-xs text-[var(--accent)] anim-fade">
+              · makes {indices.length} card{indices.length === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
+
+        {isCloze && (
+          <div className="mt-2 p-2.5 rounded-[var(--radius)] bg-[var(--surface-2)] border border-[var(--border)] anim-fade">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-faint)] mb-1.5">
+              Preview
+            </p>
+            <div className="space-y-1">
+              {indices.map((i) => (
+                <p key={i} className="text-[13px] text-[var(--text-muted)]">
+                  <span className="text-[var(--text-faint)] tabular-nums mr-1.5">
+                    {i}.
+                  </span>
+                  {renderCloze(draft.front, i, "front")
+                    .map((s) => s.text)
+                    .join("")}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-2">
+          <MediaAttachments
+            attachments={draft.attachments}
+            onChange={(a) => set("attachments", a)}
+            side="front"
+            compact
+          />
+        </div>
+      </div>
+
+      <div>
+        <label
+          htmlFor="card-back"
+          className="block text-[13px] font-medium text-[var(--text-muted)] mb-1.5"
+        >
+          Back
+          {isCloze && (
+            <span className="text-[var(--text-faint)]"> · optional extra context</span>
+          )}
+        </label>
+        <MediaTextarea
+          id="card-back"
+          value={draft.back}
+          onChange={(e) => set("back", e.target.value)}
+          onFiles={back.upload}
+          uploading={back.uploading}
+          hint="back"
+          placeholder="The answer — paste an image or drop a file right here"
+          rows={2}
+          className="field"
+        />
+        <div className="mt-2">
+          <MediaAttachments
+            attachments={draft.attachments}
+            onChange={(a) => set("attachments", a)}
+            side="back"
+            compact
+          />
+        </div>
+      </div>
+
+      {!showMore ? (
+        <button
+          type="button"
+          onClick={() => setShowMore(true)}
+          className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors inline-flex items-center gap-1"
+        >
+          <Icon name="chevronDown" className="w-3.5 h-3.5" />
+          Add hint, notes or tags
+        </button>
+      ) : (
+        <div className="space-y-4 pt-1 anim-fade">
+          <div>
+            <label
+              htmlFor="card-hint"
+              className="block text-[13px] font-medium text-[var(--text-muted)] mb-1.5"
+            >
+              Hint <span className="text-[var(--text-faint)]">· shown on request</span>
+            </label>
+            <input
+              id="card-hint"
+              value={draft.hint}
+              onChange={(e) => set("hint", e.target.value)}
+              placeholder="A nudge when you're stuck"
+              className="field"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="card-notes"
+              className="block text-[13px] font-medium text-[var(--text-muted)] mb-1.5"
+            >
+              Notes <span className="text-[var(--text-faint)]">· shown after the answer</span>
+            </label>
+            <textarea
+              id="card-notes"
+              value={draft.notes}
+              onChange={(e) => set("notes", e.target.value)}
+              placeholder="Context, mnemonics, a source link…"
+              rows={2}
+              className="field"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="card-tags"
+              className="block text-[13px] font-medium text-[var(--text-muted)] mb-1.5"
+            >
+              Tags
+            </label>
+            <div className="flex flex-wrap gap-1.5 items-center">
+              {draft.tags.map((t) => (
+                <span
+                  key={t}
+                  className="inline-flex items-center gap-1 h-6 pl-2 pr-1 rounded-md bg-[var(--accent-soft)] text-[var(--accent)] text-xs font-medium"
+                >
+                  {t}
+                  <button
+                    type="button"
+                    onClick={() => set("tags", draft.tags.filter((x) => x !== t))}
+                    aria-label={`Remove tag ${t}`}
+                    className="hover:opacity-60"
+                  >
+                    <Icon name="x" className="w-3 h-3" strokeWidth={2.4} />
+                  </button>
+                </span>
+              ))}
+              <input
+                id="card-tags"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === ",") {
+                    e.preventDefault();
+                    commitTag();
+                  } else if (e.key === "Backspace" && !tagInput && draft.tags.length) {
+                    set("tags", draft.tags.slice(0, -1));
+                  }
+                }}
+                onBlur={commitTag}
+                placeholder={draft.tags.length ? "" : "Type and press Enter"}
+                className="field flex-1 min-w-[10rem] h-8 py-0 text-xs"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ==========================================================================
+ * Chapter picker — a flat "Course › Chapter" list with inline creation, so
+ * you never have to leave the form to make a home for a card.
+ * ========================================================================== */
+
+export function ChapterPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (chapterId: string) => void;
+}) {
+  const [options, setOptions] = useState<
+    { id: string; label: string; courseName: string }[]
+  >([]);
+  const [creating, setCreating] = useState(false);
+  const [newCourse, setNewCourse] = useState("");
+  const [newChapter, setNewChapter] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    const courses = await api<CourseWithCounts[]>("/courses");
+    const all: { id: string; label: string; courseName: string }[] = [];
+    for (const c of courses) {
+      const chapters = await api<Chapter[]>(`/chapters?courseId=${c.id}`);
+      for (const ch of chapters) {
+        all.push({
+          id: ch.id,
+          label: `${c.emoji ? c.emoji + " " : ""}${c.name} › ${ch.name}`,
+          courseName: c.name,
+        });
+      }
+    }
+    setOptions(all);
+    return all;
+  };
+
+  useEffect(() => {
+    void load().then((all) => {
+      if (!value && all.length > 0) {
+        const remembered = recallChapter();
+        onChange(all.some((o) => o.id === remembered) ? remembered : all[0].id);
+      }
+      if (all.length === 0) setCreating(true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const create = async () => {
+    if (!newCourse.trim() && !newChapter.trim()) return;
+    setBusy(true);
+    try {
+      const course = await api<Course>("/courses", {
+        method: "POST",
+        json: { name: newCourse.trim() || "My cards" },
+      });
+      const chapter = await api<Chapter>("/chapters", {
+        method: "POST",
+        json: { courseId: course.id, name: newChapter.trim() || "Chapter 1" },
+      });
+      await load();
+      onChange(chapter.id);
+      rememberChapter(chapter.id);
+      setCreating(false);
+      setNewCourse("");
+      setNewChapter("");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (creating) {
+    return (
+      <div className="p-3 rounded-[var(--radius)] bg-[var(--surface-2)] border border-[var(--border)] space-y-2.5">
+        <p className="text-[13px] font-medium">Where should this live?</p>
+        <div className="flex gap-2">
+          <input
+            value={newCourse}
+            onChange={(e) => setNewCourse(e.target.value)}
+            placeholder="Course (e.g. Biology)"
+            className="field"
+          />
+          <input
+            value={newChapter}
+            onChange={(e) => setNewChapter(e.target.value)}
+            placeholder="Chapter (e.g. Cells)"
+            className="field"
+            onKeyDown={(e) => e.key === "Enter" && void create()}
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="primary" onClick={create} loading={busy}>
+            Create
+          </Button>
+          {options.length > 0 && (
+            <Button size="sm" variant="ghost" onClick={() => setCreating(false)}>
+              Cancel
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label="Chapter"
+        className="field h-9 py-0 grow"
+      >
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <Button size="sm" variant="ghost" onClick={() => setCreating(true)} title="New course or chapter">
+        <Icon name="plus" className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+}

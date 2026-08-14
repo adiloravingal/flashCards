@@ -1,0 +1,17 @@
+services:
+  flashcards:
+    build: .
+    container_name: flashcards
+    restart: unless-stopped
+    ports:
+      - "3939:3939"
+    volumes:
+      # Everything you own — database and media — lives in this one volume.
+      - ./data:/data
+    environment:
+      FC_DATA_DIR: /data
+      # Set a long random string and keep it secret; agents authenticate with it.
+      FC_AGENT_KEY: ${FC_AGENT_KEY:-}
+      # On a home server, require the key once before the UI opens.
+      FC_LOCK_UI: ${FC_LOCK_UI:-1}
+      FC_MAX_UPLOAD_MB: ${FC_MAX_UPLOAD_MB:-64}
