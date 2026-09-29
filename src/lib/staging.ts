@@ -36,12 +36,12 @@ export function stageUpload(buffer: Buffer, extension: string): string {
 
 export function stagedPath(id: string, extension: string): string {
   // `id` is always a UUID we generated, never user input.
-  return path.join(STAGING_DIR, `${id}.${extension}`);
+  return path.join(/* turbopackIgnore: true */ STAGING_DIR, `${id}.${extension}`);
 }
 
 export function readStaged(id: string, extension: string): Buffer | null {
   try {
-    return fs.readFileSync(stagedPath(id, extension));
+    return fs.readFileSync(/* turbopackIgnore: true */ stagedPath(id, extension));
   } catch {
     return null;
   }

@@ -15,8 +15,12 @@ import type { SqliteDb } from "./sqlite/types";
  * database is always ready by the time a handler runs.
  */
 
+// turbopackIgnore tells the bundler not to trace this. The path is resolved
+// at runtime from an env var, which static analysis reads as "could be
+// anything" — so it conservatively bundles the entire project into the server
+// output. The directory is data the app writes, never code it imports.
 export const DATA_DIR = path.resolve(
-  process.cwd(),
+  /* turbopackIgnore: true */ process.cwd(),
   process.env.FC_DATA_DIR || "./data",
 );
 export const MEDIA_DIR = path.join(DATA_DIR, "media");
