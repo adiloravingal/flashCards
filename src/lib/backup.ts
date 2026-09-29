@@ -1,7 +1,8 @@
+import { MEDIA_DIR } from "./db-node";
 import { unzipSync, zipSync } from "fflate";
 import fs from "node:fs";
 import path from "node:path";
-import { getDb, MEDIA_DIR } from "./db";
+import { getDb } from "./db";
 import { MIGRATIONS } from "./schema";
 
 /**

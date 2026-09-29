@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fail, handler, ok } from "@/lib/api";
 import { readApkg } from "@/lib/anki";
-import { DATA_DIR } from "@/lib/db";
+import { DATA_DIR } from "@/lib/db-node";
 import { logEvent } from "@/lib/log";
 
 export const dynamic = "force-dynamic";

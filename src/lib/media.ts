@@ -1,7 +1,8 @@
+import { MEDIA_DIR } from "./db-node";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { MEDIA_DIR, getDb, newId, now } from "./db";
+import { getDb, newId, now } from "./db";
 import type { MediaKind, MediaRow } from "./types";
 
 export const MAX_UPLOAD_BYTES =

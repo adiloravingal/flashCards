@@ -12,6 +12,7 @@
     "setup": "bash scripts/setup.sh"
   },
   "dependencies": {
+    "@sqlite.org/sqlite-wasm": "^3.53.4-build1",
     "better-sqlite3": "^13.0.3",
     "exceljs": "^4.4.0",
     "fflate": "^0.8.3",

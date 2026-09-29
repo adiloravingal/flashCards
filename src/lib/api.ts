@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+// Side-effect import: registers the server database driver. Every route goes
+// through `handler()`, so this guarantees `getDb()` is ready in all of them.
+import "./db-node";
 import { z } from "zod";
 import { authenticate, clientIp } from "./auth";
 import { logEvent, type Actor } from "./log";

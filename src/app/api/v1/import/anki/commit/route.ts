@@ -3,7 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 import { fail, handler, ok, parseBody } from "@/lib/api";
 import { noteToCard, readApkg, type AnkiNote } from "@/lib/anki";
-import { DATA_DIR } from "@/lib/db";
+import { DATA_DIR } from "@/lib/db-node";
 import { logEvent } from "@/lib/log";
 import { saveUpload } from "@/lib/media";
 import {

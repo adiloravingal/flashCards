@@ -1,97 +1,43 @@
-import Database from "better-sqlite3";
-import { randomBytes, randomUUID } from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
-import { MIGRATIONS } from "./schema";
+import { runMigrations } from "./migrate";
+import type { SqliteDb } from "./sqlite/types";
 import { DEFAULT_SETTINGS, type Settings } from "./settings-shared";
 
-/** Absolute path to the folder holding the database and all uploaded media. */
-export const DATA_DIR = path.resolve(
-  process.cwd(),
-  process.env.FC_DATA_DIR || "./data",
-);
-export const MEDIA_DIR = path.join(DATA_DIR, "media");
-/** Uploads held between an import's preview step and its commit step. */
-export const STAGING_DIR = path.join(DATA_DIR, "staging");
-const DB_PATH = path.join(DATA_DIR, "app.db");
-
 /**
- * Next.js hot-reloads modules in dev, which would otherwise open a new SQLite
- * handle on every edit. Stash the connection on globalThis so we keep exactly
- * one per process.
+ * The database, wherever it happens to live.
+ *
+ * This module is deliberately environment-neutral — no `node:` imports, no
+ * filesystem, no better-sqlite3. That is what lets `repo.ts` and everything
+ * built on it run unchanged on a server *and* inside a phone, with only the
+ * driver swapped underneath.
+ *
+ * Whoever boots the app registers a driver:
+ *   server  →  src/lib/db-node.ts     (better-sqlite3, file on disk)
+ *   device  →  src/lib/db-browser.ts  (SQLite compiled to WASM, one saved file)
  */
-const globalForDb = globalThis as unknown as {
-  __fcDb?: Database.Database;
-};
 
-function open(): Database.Database {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.mkdirSync(MEDIA_DIR, { recursive: true });
+const globalForDb = globalThis as unknown as { __fcDb?: SqliteDb };
 
-  const db = new Database(DB_PATH);
-  db.pragma("journal_mode = WAL"); // survives crashes, allows concurrent reads
-  db.pragma("synchronous = NORMAL");
-  db.pragma("foreign_keys = ON");
-  db.pragma("busy_timeout = 5000");
+export function registerDatabase(db: SqliteDb): void {
+  globalForDb.__fcDb = db;
+}
 
-  migrate(db);
-  ensureAgentKey(db);
+export function isDatabaseReady(): boolean {
+  return !!globalForDb.__fcDb;
+}
+
+export function getDb(): SqliteDb {
+  const db = globalForDb.__fcDb;
+  if (!db) {
+    throw new Error(
+      "No database registered. Import db-node (server) or db-browser (device) before using the app.",
+    );
+  }
   return db;
 }
 
-function migrate(db: Database.Database) {
-  const applied = db.pragma("user_version", { simple: true }) as number;
-  if (applied >= MIGRATIONS.length) return;
+export { runMigrations };
 
-  for (let i = applied; i < MIGRATIONS.length; i++) {
-    const m = MIGRATIONS[i];
-    const run = db.transaction(() => {
-      db.exec(m.sql);
-      db.pragma(`user_version = ${i + 1}`);
-    });
-    run();
-    console.log(`[flashcards] applied migration ${m.name}`);
-  }
-}
-
-/**
- * The agent key is what external AI agents present to use /api/v1.
- * If the user did not set FC_AGENT_KEY we mint one on first boot and persist
- * it, so the key is stable across restarts without any setup step.
- */
-function ensureAgentKey(db: Database.Database) {
-  const fromEnv = process.env.FC_AGENT_KEY?.trim();
-  if (fromEnv) {
-    db.prepare(
-      "INSERT INTO meta (key, value) VALUES ('agent_key', ?) " +
-        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-    ).run(fromEnv);
-    return;
-  }
-
-  const existing = db
-    .prepare("SELECT value FROM meta WHERE key = 'agent_key'")
-    .get() as { value: string } | undefined;
-  if (existing) return;
-
-  const key = `fc_${randomBytes(24).toString("base64url")}`;
-  db.prepare("INSERT INTO meta (key, value) VALUES ('agent_key', ?)").run(key);
-  try {
-    fs.writeFileSync(path.join(DATA_DIR, "agent-key.txt"), key + "\n", {
-      mode: 0o600,
-    });
-  } catch {
-    /* non-fatal — the key is also visible in Settings */
-  }
-  console.log(`[flashcards] generated agent API key -> data/agent-key.txt`);
-}
-
-export function getDb(): Database.Database {
-  if (!globalForDb.__fcDb) globalForDb.__fcDb = open();
-  return globalForDb.__fcDb;
-}
-
-export const newId = (): string => randomUUID();
+export const newId = (): string => globalThis.crypto.randomUUID();
 export const now = (): number => Date.now();
 
 /* --------------------------------------------------------------------------
@@ -101,8 +47,7 @@ export const now = (): number => Date.now();
 export { DEFAULT_SETTINGS, type Settings } from "./settings-shared";
 
 export function getSettings(): Settings {
-  const db = getDb();
-  const rows = db.prepare("SELECT key, value FROM settings").all() as {
+  const rows = getDb().prepare("SELECT key, value FROM settings").all() as {
     key: string;
     value: string;
   }[];
@@ -136,20 +81,12 @@ export function getAgentKey(): string {
   return row?.value ?? "";
 }
 
-export function rotateAgentKey(): string {
-  const key = `fc_${randomBytes(24).toString("base64url")}`;
+/** Store a key. Persisting it outside the database is the caller's business. */
+export function setAgentKey(key: string): void {
   getDb()
     .prepare(
       "INSERT INTO meta (key, value) VALUES ('agent_key', ?) " +
         "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
     )
     .run(key);
-  try {
-    fs.writeFileSync(path.join(DATA_DIR, "agent-key.txt"), key + "\n", {
-      mode: 0o600,
-    });
-  } catch {
-    /* non-fatal */
-  }
-  return key;
 }

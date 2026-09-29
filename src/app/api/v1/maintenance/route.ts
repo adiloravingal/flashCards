@@ -1,5 +1,6 @@
+import { rotateAgentKey } from "@/lib/db-node";
 import { fail, handler, ok } from "@/lib/api";
-import { getAgentKey, getDb, rotateAgentKey } from "@/lib/db";
+import { getAgentKey, getDb } from "@/lib/db";
 import { logEvent, pruneLogs } from "@/lib/log";
 import { collectOrphanedMedia } from "@/lib/media";
 import { parseScope, resetProgress } from "@/lib/repo";
