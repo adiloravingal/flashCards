@@ -164,7 +164,7 @@ export default function SearchPage() {
                     <div className="flex flex-wrap items-center gap-1.5 mt-2">
                       {card.courseName && (
                         <Link
-                          href={`/courses/${card.courseId}`}
+                          href={`/course?id=${card.courseId}`}
                           className="text-[11px] text-[var(--text-faint)] hover:text-[var(--accent)] transition-colors"
                         >
                           {card.courseName} › {card.chapterName}

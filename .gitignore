@@ -39,6 +39,11 @@ android/build/
 android/.gradle/
 android/local.properties
 android/app/release/
+# Copied in by `cap sync` from out/ — regenerated on every device build.
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/capacitor-cordova-android-plugins/
+android/.idea/
 ios/App/build/
 *.apk
 *.aab
@@ -80,3 +85,4 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+.next-device/

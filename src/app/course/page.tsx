@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import {
   Badge,
   Button,
@@ -29,7 +29,17 @@ type ChapterRow = Chapter & {
 type CourseDetail = Course & { chapters: ChapterRow[]; counts: Counts };
 
 export default function CoursePage() {
-  const { courseId } = useParams<{ courseId: string }>();
+  // useSearchParams needs a Suspense boundary to be statically exportable,
+  // which the device build requires.
+  return (
+    <Suspense fallback={<div className="grid place-items-center py-24"><Spinner className="w-6 h-6 text-[var(--text-faint)]" /></div>}>
+      <CourseDetailView />
+    </Suspense>
+  );
+}
+
+function CourseDetailView() {
+  const courseId = useSearchParams().get("id") ?? "";
   const router = useRouter();
   const { data, loading, reload } = useApi<CourseDetail>(`/courses/${courseId}`);
   const [creating, setCreating] = useState(false);
@@ -189,7 +199,7 @@ export default function CoursePage() {
               className="p-3.5 flex items-center gap-3 group transition-colors hover:border-[var(--border-strong)]"
             >
               <Link
-                href={`/courses/${courseId}/${ch.id}`}
+                href={`/chapter?course=${courseId}&id=${ch.id}`}
                 className="min-w-0 grow flex items-center gap-3"
               >
                 <div className="min-w-0 grow">

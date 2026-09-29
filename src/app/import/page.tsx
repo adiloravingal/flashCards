@@ -154,7 +154,7 @@ export default function ImportPage() {
           (result.mediaImported ? ` and ${result.mediaImported} files` : ""),
         "success",
       );
-      router.push(`/courses/${result.courseId}`);
+      router.push(`/course?id=${result.courseId}`);
     } catch (err) {
       push(err instanceof Error ? err.message : "Import failed", "error");
     } finally {
@@ -212,7 +212,7 @@ export default function ImportPage() {
           (result.mediaImported ? ` and ${result.mediaImported} files` : ""),
         "success",
       );
-      router.push(result.courseId ? `/courses/${result.courseId}` : "/courses");
+      router.push(result.courseId ? `/course?id=${result.courseId}` : "/courses");
     } catch (err) {
       push(err instanceof Error ? err.message : "Import failed", "error");
     } finally {
@@ -279,7 +279,7 @@ export default function ImportPage() {
         },
       );
       push(`Imported ${result.created} cards`, "success");
-      router.push(`/courses/${result.courseId}`);
+      router.push(`/course?id=${result.courseId}`);
     } catch (err) {
       push(err instanceof Error ? err.message : "Import failed", "error");
     } finally {

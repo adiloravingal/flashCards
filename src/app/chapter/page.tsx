@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { CardForm, draftFromCard, type CardDraft } from "@/components/CardForm";
 import {
   Badge,
@@ -26,10 +26,17 @@ type ChapterDetail = Chapter & { course: Course | null; counts: Counts };
 const STATE_LABEL = ["New", "Learning", "Review", "Relearning"];
 
 export default function ChapterPage() {
-  const { courseId, chapterId } = useParams<{
-    courseId: string;
-    chapterId: string;
-  }>();
+  return (
+    <Suspense fallback={<div className="grid place-items-center py-24"><Spinner className="w-6 h-6 text-[var(--text-faint)]" /></div>}>
+      <ChapterDetailView />
+    </Suspense>
+  );
+}
+
+function ChapterDetailView() {
+  const search = useSearchParams();
+  const courseId = search.get("course") ?? "";
+  const chapterId = search.get("id") ?? "";
 
   const chapter = useApi<ChapterDetail>(`/chapters/${chapterId}`);
   const cards = useApi<{ cards: Card[]; total: number }>(
@@ -111,7 +118,7 @@ export default function ChapterPage() {
       <PageHeader
         back={
           <Link
-            href={`/courses/${courseId}`}
+            href={`/course?id=${courseId}`}
             className="inline-flex items-center gap-1 text-[13px] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors mb-2"
           >
             <Icon name="chevronLeft" className="w-3.5 h-3.5" />

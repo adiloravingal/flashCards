@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">flashCards</string>
+    <string name="title_activity_main">flashCards</string>
+    <string name="package_name">io.flashcards.app</string>
+    <string name="custom_url_scheme">io.flashcards.app</string>
+</resources>

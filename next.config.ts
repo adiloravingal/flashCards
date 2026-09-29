@@ -42,7 +42,24 @@ function localOrigins(): string[] {
   return [...origins];
 }
 
+/**
+ * The device build (Capacitor / Android) is a fully static bundle with no
+ * server: no route handlers, no image optimiser, nothing that needs Node at
+ * runtime. `scripts/build-device.sh` sets this.
+ */
+const isDevice = process.env.FC_TARGET === "device";
+
 const nextConfig: NextConfig = {
+  ...(isDevice
+    ? {
+        output: "export" as const,
+        images: { unoptimized: true },
+        // Its own dist dir: sharing .next with the server build leaves stale
+        // route type-validators behind that reference handlers this build
+        // deliberately does not have.
+        distDir: ".next-device",
+      }
+    : {}),
   // better-sqlite3 is a native module — keep it out of the bundler.
   serverExternalPackages: ["better-sqlite3", "exceljs"],
   allowedDevOrigins: localOrigins(),

@@ -112,7 +112,7 @@ export default function CoursesPage() {
               className="p-4 group transition-colors hover:border-[var(--border-strong)]"
             >
               <div className="flex items-start justify-between gap-3">
-                <Link href={`/courses/${c.id}`} className="min-w-0 grow">
+                <Link href={`/course?id=${c.id}`} className="min-w-0 grow">
                   <p className="font-medium truncate">
                     {c.emoji && <span className="mr-1.5">{c.emoji}</span>}
                     {c.name}

@@ -104,7 +104,7 @@ export function CommandPalette() {
         sub: "Course",
         icon: "book",
         keywords: "course deck",
-        run: () => go(`/courses/${c.id}`),
+        run: () => go(`/course?id=${c.id}`),
       });
     }
     return base;

@@ -211,7 +211,7 @@ export default function TodayPage() {
           .sort((a, b) => b.dueCards - a.dueCards)
           .slice(0, 6)
           .map((c) => (
-            <Link key={c.id} href={`/courses/${c.id}`} className="group">
+            <Link key={c.id} href={`/course?id=${c.id}`} className="group">
               <Panel className="p-4 transition-colors hover:border-[var(--border-strong)] h-full">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
