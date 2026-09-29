@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { getAgentKey, registerDatabase, runMigrations, setAgentKey } from "./db";
+import { getAgentKey, registerDatabase, registerDatabaseOpener, runMigrations, setAgentKey } from "./db";
 import { registerSafetyWriter } from "./backup";
 import { registerMediaStore } from "./mediaStore";
 import { openNodeDatabase } from "./sqlite/node";
@@ -123,9 +123,6 @@ registerSafetyWriter(async (filename, bytes) => {
   return filename;
 });
 
-// Side effect: opening on import is what makes `getDb()` safe everywhere.
-const globalForNode = globalThis as unknown as { __fcNodeDbOpen?: boolean };
-if (!globalForNode.__fcNodeDbOpen) {
-  open();
-  globalForNode.__fcNodeDbOpen = true;
-}
+// Registering the opener is a side effect of importing this module; actually
+// opening happens on the first query. See registerDatabaseOpener for why.
+registerDatabaseOpener(open);

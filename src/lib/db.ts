@@ -15,10 +15,27 @@ import { DEFAULT_SETTINGS, type Settings } from "./settings-shared";
  *   device  →  src/lib/db-browser.ts  (SQLite compiled to WASM, one saved file)
  */
 
-const globalForDb = globalThis as unknown as { __fcDb?: SqliteDb };
+const globalForDb = globalThis as unknown as {
+  __fcDb?: SqliteDb;
+  __fcOpener?: () => SqliteDb;
+};
 
 export function registerDatabase(db: SqliteDb): void {
   globalForDb.__fcDb = db;
+}
+
+/**
+ * Register *how* to open the database, without opening it.
+ *
+ * The distinction matters during `next build`: it imports every route module
+ * across a dozen worker processes just to read their config. If importing a
+ * module opened the database, every one of those workers would race to run
+ * the migrations on a fresh install — and all but one would fail.
+ *
+ * Opening on first query instead means build-time imports touch nothing.
+ */
+export function registerDatabaseOpener(open: () => SqliteDb): void {
+  globalForDb.__fcOpener = open;
 }
 
 export function isDatabaseReady(): boolean {
@@ -26,13 +43,16 @@ export function isDatabaseReady(): boolean {
 }
 
 export function getDb(): SqliteDb {
-  const db = globalForDb.__fcDb;
-  if (!db) {
-    throw new Error(
-      "No database registered. Import db-node (server) or db-browser (device) before using the app.",
-    );
+  if (globalForDb.__fcDb) return globalForDb.__fcDb;
+
+  if (globalForDb.__fcOpener) {
+    globalForDb.__fcDb = globalForDb.__fcOpener();
+    return globalForDb.__fcDb;
   }
-  return db;
+
+  throw new Error(
+    "No database registered. Import db-node (server) or db-browser (device) before using the app.",
+  );
 }
 
 export { runMigrations };
