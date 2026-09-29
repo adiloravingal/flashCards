@@ -17,6 +17,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { ExportDeckButton } from "@/components/ExportDeckButton";
+import { RenameButton, RenameDialog } from "@/components/RenameDialog";
 import { api, useApi } from "@/lib/client";
 import type { Chapter, Counts, Course } from "@/lib/types";
 
@@ -46,6 +47,10 @@ function CourseDetailView() {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [renamingChapter, setRenamingChapter] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [newName, setNewName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<ChapterRow | null>(null);
   const { push } = useToast();
@@ -122,15 +127,24 @@ function CourseDetailView() {
           </Link>
         }
         title={
-          <span
-            onDoubleClick={() => {
-              setNewName(data.name);
-              setRenaming(true);
-            }}
-            title="Double-click to rename"
-          >
-            {data.emoji && <span className="mr-2">{data.emoji}</span>}
-            {data.name}
+          <span className="inline-flex items-center gap-1.5 group">
+            <span
+              onDoubleClick={() => {
+                setNewName(data.name);
+                setRenaming(true);
+              }}
+            >
+              {data.emoji && <span className="mr-2">{data.emoji}</span>}
+              {data.name}
+            </span>
+            <RenameButton
+              alwaysVisible
+              label="Rename this course"
+              onClick={() => {
+                setNewName(data.name);
+                setRenaming(true);
+              }}
+            />
           </span>
         }
         subtitle={`${data.counts.total} cards across ${data.chapters.length} ${
@@ -220,6 +234,10 @@ function CourseDetailView() {
                     <Button size="sm">Review</Button>
                   </Link>
                 )}
+                <RenameButton
+                  label={`Rename ${ch.name}`}
+                  onClick={() => setRenamingChapter(ch)}
+                />
                 <button
                   onClick={() => setConfirmDelete(ch)}
                   aria-label={`Delete ${ch.name}`}
@@ -301,6 +319,21 @@ function CourseDetailView() {
           />
         </Field>
       </Modal>
+
+      <RenameDialog
+        open={!!renamingChapter}
+        onClose={() => setRenamingChapter(null)}
+        label="chapter"
+        current={renamingChapter?.name ?? ""}
+        onSave={async (name) => {
+          await api(`/chapters/${renamingChapter!.id}`, {
+            method: "PATCH",
+            json: { name },
+          });
+          push("Renamed", "success");
+          reload();
+        }}
+      />
 
       <ConfirmDialog
         open={!!confirmDelete}

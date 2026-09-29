@@ -15,6 +15,7 @@ import {
   Spinner,
   useToast,
 } from "@/components/ui";
+import { RenameButton, RenameDialog } from "@/components/RenameDialog";
 import { api, useApi } from "@/lib/client";
 import type { Course } from "@/lib/types";
 
@@ -31,6 +32,7 @@ export default function CoursesPage() {
   const [emoji, setEmoji] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<CourseRow | null>(null);
+  const [renaming, setRenaming] = useState<CourseRow | null>(null);
   const { push } = useToast();
 
   const create = async () => {
@@ -138,6 +140,11 @@ export default function CoursesPage() {
                       </Button>
                     </Link>
                   )}
+                  <div className="flex items-center gap-0.5">
+                    <RenameButton
+                      label={`Rename ${c.name}`}
+                      onClick={() => setRenaming(c)}
+                    />
                   <button
                     onClick={() => setConfirmDelete(c)}
                     aria-label={`Delete ${c.name}`}
@@ -145,6 +152,7 @@ export default function CoursesPage() {
                   >
                     <Icon name="trash" className="w-4 h-4" />
                   </button>
+                  </div>
                 </div>
               </div>
             </Panel>
@@ -187,6 +195,17 @@ export default function CoursesPage() {
           </Field>
         </div>
       </Modal>
+
+      <RenameDialog
+        open={!!renaming}
+        onClose={() => setRenaming(null)}
+        label="course"
+        current={renaming?.name ?? ""}
+        onSave={async (name) => {
+          await api(`/courses/${renaming!.id}`, { method: "PATCH", json: { name } });
+          await reload();
+        }}
+      />
 
       <ConfirmDialog
         open={!!confirmDelete}

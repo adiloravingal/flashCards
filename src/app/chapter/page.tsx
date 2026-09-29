@@ -17,6 +17,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { ExportDeckButton } from "@/components/ExportDeckButton";
+import { RenameButton, RenameDialog } from "@/components/RenameDialog";
 import { api, cx, relativeTime, useApi } from "@/lib/client";
 import { cardPreview } from "@/lib/cloze";
 import type { Card, Chapter, Counts, Course } from "@/lib/types";
@@ -43,6 +44,7 @@ function ChapterDetailView() {
     `/cards?chapterId=${chapterId}&limit=500`,
   );
 
+  const [renamingChapter, setRenamingChapter] = useState(false);
   const [editing, setEditing] = useState<{ id: string; draft: CardDraft } | null>(
     null,
   );
@@ -125,7 +127,16 @@ function ChapterDetailView() {
             {chapter.data.course?.name ?? "Course"}
           </Link>
         }
-        title={chapter.data.name}
+        title={
+          <span className="inline-flex items-center gap-1.5 group">
+            {chapter.data.name}
+            <RenameButton
+              alwaysVisible
+              label="Rename this chapter"
+              onClick={() => setRenamingChapter(true)}
+            />
+          </span>
+        }
         subtitle={`${chapter.data.counts.total} cards · ${chapter.data.counts.due} due · ${chapter.data.counts.new} new`}
         actions={
           <>
@@ -276,6 +287,18 @@ function ChapterDetailView() {
           ))}
         </div>
       )}
+
+      <RenameDialog
+        open={renamingChapter}
+        onClose={() => setRenamingChapter(false)}
+        label="chapter"
+        current={chapter.data?.name ?? ""}
+        onSave={async (name) => {
+          await api(`/chapters/${chapterId}`, { method: "PATCH", json: { name } });
+          push("Renamed", "success");
+          chapter.reload();
+        }}
+      />
 
       <Modal
         open={!!editing}
