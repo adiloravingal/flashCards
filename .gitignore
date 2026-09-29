@@ -24,6 +24,28 @@ flashcards-backup-*.json
 *.key
 *.crt
 
+# Android signing. Committing these to a public repo would let anyone publish
+# updates as you, and the keystore cannot be regenerated — lose it and you can
+# never update an installed app, only replace it.
+*.jks
+*.keystore
+key.properties
+android/key.properties
+
+# Capacitor / Android build output. The android/ folder itself is meant to be
+# committed; what Gradle generates inside it is not.
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/app/release/
+ios/App/build/
+*.apk
+*.aab
+
+# Personal scratch kept out of the public repo but left on disk.
+LANDING_PAGE_PROMPT.md
+
 # Claude Code's per-machine settings. `launch.json` is shared project config
 # and is deliberately left tracked.
 .claude/settings.local.json

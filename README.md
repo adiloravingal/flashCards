@@ -147,6 +147,7 @@ src/
     importer.ts     xlsx/csv parsing and column detection
     anki.ts         .apkg reading: zip, zstd, both collection schemas
     deck.ts         .fcdeck — the shareable export/import format
+    backup.ts       .fcbackup — whole-device export, restore and safety copies
     periods.ts      day/week/month aggregation for the Progress screen
     staging.ts      holds an upload between an import's preview and commit
     media.ts        upload, content-hash dedupe, MIME resolution
@@ -173,7 +174,22 @@ per deletion index, grouped by `note_id`, each with its own schedule. Editing
 shared text fans out across siblings while preserving their individual review
 histories — that invariant is the whole reason the two concepts are separate.
 
-**Two kinds of export, on purpose.** `Settings → Backup` writes the whole
+**Three kinds of export, on purpose.**
+
+| File | Holds | For |
+| --- | --- | --- |
+| `.fcdeck` | cards + media | giving a course or chapter to someone else |
+| `.fcbackup` | everything, ids preserved | moving your own collection between devices |
+| `.json` | cards as readable text | reading your data in another tool |
+
+A `.fcbackup` is a mirror, not a copy: row ids are preserved, so restoring the
+same file twice changes nothing and a card keeps its identity across machines.
+Restores come in two modes — `merge` adds only what is missing and never
+overwrites local scheduling, `replace` makes the device identical to the file
+and writes a safety copy into `data/` before removing anything. The agent API
+key is deliberately excluded from backups so the file is safe to move around.
+
+**Two kinds of deck export, on purpose.** `Settings → Backup` writes the whole
 collection as JSON *including* scheduling — it is meant to come back to you.
 `Export course` / `Export chapter` writes a `.fcdeck` zip (deck.json + media)
 carrying content only — it is meant for someone else, and your intervals

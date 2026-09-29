@@ -23,6 +23,7 @@ const SECTIONS = [
   { id: "cloze", label: "Cloze deletions" },
   { id: "import", label: "Importing spreadsheets" },
   { id: "sharing", label: "Sharing a course or chapter" },
+  { id: "devices", label: "Using more than one device" },
   { id: "anki", label: "Importing Anki decks" },
   { id: "media", label: "Images, audio & files" },
   { id: "scheduling", label: "How scheduling works" },
@@ -378,6 +379,57 @@ export default function DocsPage() {
               For your own backup, use <A href="/settings">Settings → Backup</A>{" "}
               instead. That export <em>does</em> keep scheduling, because it&apos;s
               meant to come back to you.
+            </Callout>
+          </Doc>
+
+          <Doc id="devices" title="Using more than one device">
+            <P>
+              There is no account and nothing syncs over the internet, so you
+              move between devices by moving a file. Go to{" "}
+              <A href="/settings">Settings → Moving between devices</A> and
+              press <B>Export everything</B>. You get one{" "}
+              <C>.fcbackup</C> file holding every card, every image and audio
+              file, your settings, and your whole review history.
+            </P>
+            <P>
+              Put that file on the other device however you like — AirDrop, a
+              USB stick, a shared folder — then press{" "}
+              <B>Restore from a backup</B> there and pick it. You&apos;ll see
+              what&apos;s in the file next to what&apos;s already on that
+              device before anything happens.
+            </P>
+            <List
+              items={[
+                <>
+                  <B>Add what&apos;s missing</B> brings across anything that
+                  device doesn&apos;t have. Cards you already study there keep
+                  their own schedule — nothing is overwritten. This is the
+                  safe one, and it&apos;s pre-selected when the device already
+                  has cards.
+                </>,
+                <>
+                  <B>Replace everything</B> makes that device an exact copy:
+                  same cards, same due dates, same history. Anything on it that
+                  isn&apos;t in the file is removed. A copy of what was there is
+                  written into <C>data/</C> first, so a mistake costs a minute.
+                </>,
+                <>
+                  <B>Restoring twice is harmless.</B> Cards keep their identity
+                  across devices, so the same file applied again changes
+                  nothing.
+                </>,
+                <>
+                  <B>Your API key is never in the file.</B> Each device keeps
+                  its own, so a backup is safe to send through anything.
+                </>,
+              ]}
+            />
+            <Callout>
+              This is a one-way copy, not sync. If you study on both devices and
+              then restore in one direction, whichever device you restored
+              <em>onto</em> loses the progress it made. Pick a direction each
+              time — or use <B>Add what&apos;s missing</B>, which never throws
+              work away.
             </Callout>
           </Doc>
 

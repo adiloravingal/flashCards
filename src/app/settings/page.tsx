@@ -12,6 +12,7 @@ import {
   Toggle,
   useToast,
 } from "@/components/ui";
+import { BackupPanel } from "@/components/BackupPanel";
 import { api, cx } from "@/lib/client";
 
 export default function SettingsPage() {
@@ -238,6 +239,13 @@ export default function SettingsPage() {
 
       {/* ---- Data ---------------------------------------------------------- */}
       <Section
+        title="Moving between devices"
+        desc="Export here, restore on your phone, laptop or anywhere else you run this."
+      >
+        <BackupPanel />
+      </Section>
+
+      <Section
         title="Your data"
         desc="Everything lives in the data/ folder next to the app. Copy that folder and you have a complete backup."
       >
@@ -245,10 +253,15 @@ export default function SettingsPage() {
           <a href="/api/v1/export" download>
             <Button>
               <Icon name="download" className="w-4 h-4" />
-              Export everything as JSON
+              Export as plain JSON
             </Button>
           </a>
         </div>
+        <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+          Readable text rather than an archive, for reading your cards in
+          another tool. It has no media files in it — use the backup above to
+          move devices.
+        </p>
 
         <div className="pt-4 border-t border-[var(--border)] space-y-2">
           <p className="text-sm font-medium">Maintenance</p>

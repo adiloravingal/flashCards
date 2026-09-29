@@ -43,6 +43,11 @@ export const GET = handler(async () => {
         "DELETE endpoints cascade (deleting a course deletes its chapters and cards). Prefer PATCH {archived: 1} over DELETE unless the user explicitly asked to delete.",
     },
     hierarchy: "Course > Chapter > Card. Every card belongs to exactly one chapter.",
+    fileFormats: {
+      ".fcdeck": "A course or chapter to give someone else. Content and media, no scheduling.",
+      ".fcbackup": "A whole device. Every table, media, settings, scheduling and review history, with ids preserved so a restore is a mirror and re-importing is idempotent.",
+      "guidance": "Use /export/deck for sharing and /backup for moving between a user's own devices. They are not interchangeable.",
+    },
     counting: {
       note: "A deck file stores notes, not cards. A cloze note becomes one card per deletion index on import, so `totalCards` in an analyze response is already expanded and will match what commit creates. `totalNotes` is the raw entry count.",
     },
@@ -137,6 +142,9 @@ export const GET = handler(async () => {
 
       { method: "GET", path: "/export", purpose: "Full JSON backup of every course, chapter and card, scheduling included." },
       { method: "GET", path: "/export/deck?courseId=|chapterId=", purpose: "A shareable `.fcdeck` zip (deck.json + media). Content only — no scheduling, because it is meant for someone else." },
+      { method: "GET", path: "/backup[?history=0]", purpose: "A complete `.fcbackup` of this device: every table plus media, ids preserved, scheduling and history included. The agent key is never included." },
+      { method: "POST", path: "/backup/analyze", purpose: "multipart `file` (.fcbackup). Returns a stagingId, what is in the file, and what is already on this device. Writes nothing." },
+      { method: "POST", path: "/backup/restore", purpose: "Body: { stagingId, mode: 'replace'|'merge', dryRun? }. 'replace' wipes this device first (a safety copy is written); 'merge' only adds what is missing and never overwrites local progress. Never call 'replace' unless the user explicitly asked to overwrite this device." },
       { method: "POST", path: "/import/deck/analyze", purpose: "multipart `file` (.fcdeck). Returns a stagingId and what's inside. Writes nothing." },
       { method: "POST", path: "/import/deck/commit", purpose: "Body: { stagingId, courseName?, courseId?, chapters?, dryRun? }." },
     ],

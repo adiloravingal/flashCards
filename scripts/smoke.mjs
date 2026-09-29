@@ -438,10 +438,60 @@ async function main() {
     ok("spec lists the anki endpoints", JSON.stringify(spec.endpoints).includes("/import/anki/commit"));
     ok("spec lists deck sharing", JSON.stringify(spec.endpoints).includes("/export/deck"));
     ok("spec lists the period endpoint", JSON.stringify(spec.endpoints).includes("/stats/period"));
+    ok("spec lists device backup", JSON.stringify(spec.endpoints).includes("/backup/restore"));
 
     const res = await fetch(BASE + "/export", { headers: H });
     const dump = await res.json();
     ok("export contains the tree", dump.courses?.some((c) => c.chapters?.[0]?.cards?.length > 0));
+  }
+
+  section("Device backup");
+  {
+    // Deliberately never exercises "replace" here: this suite runs against a
+    // real collection, and a replace would wipe it. Merge is the safe mode and
+    // still proves the round trip, because merging your own backup must be a
+    // no-op.
+    const res = await fetch(`${BASE}/backup`, { headers: H });
+    ok("exports a .fcbackup", res.status === 200 && res.headers.get("content-type") === "application/zip", res.status);
+    ok("suggests a dated filename", /\.fcbackup"/.test(res.headers.get("content-disposition") ?? ""), res.headers.get("content-disposition"));
+
+    const bytes = Buffer.from(await res.arrayBuffer());
+    const { unzipSync } = await import("fflate");
+    const entries = unzipSync(new Uint8Array(bytes));
+    ok("archive holds backup.json", !!entries["backup.json"], Object.keys(entries).slice(0, 5));
+
+    const meta = JSON.parse(new TextDecoder().decode(entries["backup.json"]));
+    ok("tagged with the backup format", meta.format === "flashcards.io/backup", meta.format);
+    ok("keeps scheduling, unlike a deck", JSON.stringify(meta.tables.cards ?? []).includes("stability") || (meta.counts.cards ?? 0) === 0);
+    ok("never contains the API key", !JSON.stringify(meta).includes(KEY) && !JSON.stringify(meta).includes("agent_key"));
+    ok("media file count is reported honestly",
+      (meta.counts.mediaFiles ?? 0) === Object.keys(entries).filter((k) => k.startsWith("media/")).length,
+      { reported: meta.counts.mediaFiles, inZip: Object.keys(entries).filter((k) => k.startsWith("media/")).length });
+
+    const fd = new FormData();
+    fd.append("file", new File([bytes], "smoke.fcbackup"));
+    const analysed = await fetch(`${BASE}/backup/analyze`, { method: "POST", headers: H, body: fd })
+      .then((r) => r.json());
+    ok("analyses the backup", analysed.ok === true, analysed);
+    ok("reports what is already here", typeof analysed.data.current.cards === "number", analysed.data.current);
+    ok("incoming count matches the export", analysed.data.incoming.cards === (meta.counts.cards ?? 0), {
+      incoming: analysed.data.incoming.cards, exported: meta.counts.cards });
+
+    const before = (await get("/health")).counts.total;
+    await req("/backup/restore", { method: "POST", json: { stagingId: analysed.data.stagingId, mode: "merge", dryRun: true } });
+    ok("dry run changes nothing", (await get("/health")).counts.total === before);
+
+    const merged = await req("/backup/restore", { method: "POST", json: { stagingId: analysed.data.stagingId, mode: "merge" } });
+    ok("merge restore succeeds", merged.status === 200, merged.body);
+    ok("merging your own backup duplicates nothing", (await get("/health")).counts.total === before,
+      { before, after: (await get("/health")).counts.total });
+    ok("merge writes no safety copy (nothing destroyed)", merged.body.data.safetyBackup === null, merged.body.data.safetyBackup);
+
+    const stale = await req("/backup/restore", {
+      method: "POST",
+      json: { stagingId: "00000000-0000-4000-8000-000000000000", mode: "merge" },
+    });
+    ok("expired staging id is a clean 404", stale.status === 404, stale.status);
   }
 
   section("Cleanup");
