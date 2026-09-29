@@ -13,6 +13,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { BackupPanel } from "@/components/BackupPanel";
+import { VersionPanel } from "@/components/VersionPanel";
 import { api, cx } from "@/lib/client";
 
 export default function SettingsPage() {
@@ -238,6 +239,13 @@ export default function SettingsPage() {
       </Section>
 
       {/* ---- Data ---------------------------------------------------------- */}
+      <Section
+        title="Version"
+        desc="This app never contacts the internet on its own. Checking is a button, not a background task."
+      >
+        <VersionPanel />
+      </Section>
+
       <Section
         title="Moving between devices"
         desc="Export here, restore on your phone, laptop or anywhere else you run this."

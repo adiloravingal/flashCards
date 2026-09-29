@@ -87,3 +87,5 @@ Thumbs.db
 *.swo
 .next-device/
 public/sqlite/
+data-backup-*/
+.fc-sqlite-probe.cjs

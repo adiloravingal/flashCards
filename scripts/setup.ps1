@@ -138,8 +138,15 @@ db.exec("CREATE VIRTUAL TABLE fts USING fts5(x)");
 db.close();
 '@
 
-$probeFile = Join-Path $env:TEMP "fc-sqlite-probe-$PID.js"
-# ASCII, so 5.1 doesn't prepend a BOM that Node has to work around.
+# Two things matter about where this file goes.
+#
+# The extension must be .cjs: package.json declares "type": "module", so a
+# plain .js here is treated as an ES module and `require` throws.
+#
+# And it must sit in the project, not in TEMP. Node resolves modules relative
+# to the file, so from a temp directory `require('better-sqlite3')` finds
+# nothing at all.
+$probeFile = Join-Path $Root ".fc-sqlite-probe.cjs"
 Set-Content -Path $probeFile -Value $probe -Encoding ASCII
 node $probeFile 2>$null
 $probeOk = ($LASTEXITCODE -eq 0)

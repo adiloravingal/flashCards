@@ -1,3 +1,5 @@
+import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { hostname, networkInterfaces } from "node:os";
 import type { NextConfig } from "next";
 
@@ -49,7 +51,36 @@ function localOrigins(): string[] {
  */
 const isDevice = process.env.FC_TARGET === "device";
 
+/**
+ * Stamp the build with what it was built from, so Settings can tell you
+ * whether you are behind. Resolved here because a browser has no git.
+ */
+function buildStamp(): { version: string; commit: string } {
+  let version = "0.0.0";
+  try {
+    version = JSON.parse(readFileSync("package.json", "utf8")).version ?? version;
+  } catch {
+    /* keep the default */
+  }
+  let commit = "";
+  try {
+    commit = execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  } catch {
+    // Built from a zip rather than a clone — there is simply nothing to
+    // compare against, and the UI says so.
+  }
+  return { version, commit };
+}
+
+const stamp = buildStamp();
+
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_FC_VERSION: stamp.version,
+    NEXT_PUBLIC_FC_COMMIT: stamp.commit,
+  },
   ...(isDevice
     ? {
         output: "export" as const,
