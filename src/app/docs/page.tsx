@@ -27,6 +27,7 @@ const SECTIONS = [
   { id: "android", label: "The Android app" },
   { id: "anki", label: "Importing Anki decks" },
   { id: "media", label: "Images, audio & files" },
+  { id: "occlusion", label: "Blocking parts of an image out" },
   { id: "scheduling", label: "How scheduling works" },
   { id: "agents", label: "AI agent access" },
   { id: "data", label: "Your data & backups" },
@@ -577,6 +578,43 @@ export default function DocsPage() {
               so attaching the same diagram to forty cards costs one copy on
               disk. Files live in <C>data/media/</C>.
             </P>
+          </Doc>
+
+          <Doc id="occlusion" title="Blocking parts of an image out">
+            <P>
+              A labelled diagram is already a set of questions — you just have
+              to hide the labels. Attach the image to the <B>Front</B>, then
+              hover it and hit <B>Block out</B>. Drag across anything you want
+              hidden, and each rectangle becomes a solid block. <B>Undo</B>{" "}
+              removes the last one, and hovering a block gives you an{" "}
+              <K>×</K> to delete just that one.
+            </P>
+            <P>
+              <B>Use as front</B> puts the blocked version on the question side.
+              The tick just above the Back box — <B>Show the full image as the
+              answer</B> — keeps the untouched original on the back, so turning
+              the card over reveals what was covered. It is on by default;
+              untick it if you want to answer some other way.
+            </P>
+            <List
+              items={[
+                <>
+                  <B>It is just two pictures.</B> The blocks are painted into a
+                  new image rather than stored as shapes, so masked cards review,
+                  export, and sync to your phone like any other card.
+                </>,
+                <>
+                  <B>One card, not one per block.</B> If you want a separate
+                  card per label, block out one thing, save, and repeat — or
+                  write the labels as a cloze instead.
+                </>,
+                <>
+                  <B>Re-opening Block out</B> starts from the rectangles you drew
+                  last time, on the device you drew them on. Elsewhere, it starts
+                  from the original image and an empty slate.
+                </>,
+              ]}
+            />
           </Doc>
 
           <Doc id="scheduling" title="How scheduling works">

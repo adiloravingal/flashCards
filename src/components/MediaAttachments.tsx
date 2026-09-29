@@ -69,9 +69,9 @@ export function useAttachmentUpload({
   }, [attachments]);
 
   const upload = useCallback(
-    async (files: FileList | File[]) => {
+    async (files: FileList | File[]): Promise<Attachment[]> => {
       const list = prepareForUpload(Array.from(files));
-      if (list.length === 0) return;
+      if (list.length === 0) return [];
 
       setUploading(true);
       try {
@@ -91,7 +91,7 @@ export function useAttachmentUpload({
 
         if (!payload.ok) {
           push(payload.error.message, "error");
-          return;
+          return [];
         }
 
         const added: Attachment[] = payload.data.media.map((m) => ({
@@ -123,8 +123,12 @@ export function useAttachmentUpload({
         } else if (added.length) {
           push("Already attached", "info");
         }
+        // Returned so a caller that made the file itself — the mask editor —
+        // can go on to do something with the result.
+        return fresh;
       } catch (err) {
         push(err instanceof Error ? err.message : "Upload failed", "error");
+        return [];
       } finally {
         setUploading(false);
       }
@@ -144,11 +148,16 @@ export function MediaAttachments({
   onChange,
   side,
   compact,
+  onEditImage,
+  editImageLabel = "Edit",
 }: {
   attachments: Attachment[];
   onChange: (next: Attachment[]) => void;
   side: "front" | "back";
   compact?: boolean;
+  /** Optional action offered on image chips — used for blocking parts out. */
+  onEditImage?: (a: Attachment) => void;
+  editImageLabel?: string;
 }) {
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -243,6 +252,25 @@ export function MediaAttachments({
               >
                 <Icon name="x" className="w-3 h-3" strokeWidth={2.5} />
               </button>
+
+              {onEditImage && a.kind === "image" && !undecodable.has(a.id) && (
+                <button
+                  type="button"
+                  onClick={() => onEditImage(a)}
+                  title={editImageLabel}
+                  aria-label={`${editImageLabel} — ${a.name}`}
+                  className={cx(
+                    "absolute inset-x-0 bottom-0 h-6 bg-black/70 text-white",
+                    "text-[10px] font-medium inline-flex items-center justify-center gap-1",
+                    // Always legible on touch, where there is no hover to reveal it.
+                    "opacity-0 group-hover:opacity-100 focus:opacity-100",
+                    "[@media(hover:none)]:opacity-100 transition-opacity",
+                  )}
+                >
+                  <Icon name="edit" className="w-3 h-3" strokeWidth={2.2} />
+                  {editImageLabel}
+                </button>
+              )}
             </div>
           ))}
         </div>

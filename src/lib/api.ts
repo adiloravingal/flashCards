@@ -108,12 +108,17 @@ export async function parseBody<S extends z.ZodType>(
 
   const result = schema.safeParse(raw);
   if (!result.success) {
+    // Name the field that actually failed. "Request body failed validation"
+    // alone leaves you re-reading a form with no idea which part of it the
+    // server disliked, and the details below are not always shown.
+    const first = result.error.issues[0];
+    const where = first?.path.length ? `${first.path.join(".")}: ` : "";
     return {
       ok: false,
       response: fail(
         400,
         "invalid_body",
-        "Request body failed validation.",
+        first ? `${where}${first.message}` : "Request body failed validation.",
         result.error.issues.map((i) => ({
           path: i.path.join("."),
           message: i.message,

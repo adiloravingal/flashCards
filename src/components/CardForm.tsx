@@ -10,8 +10,15 @@ import {
   useAttachmentUpload,
   type Attachment,
 } from "./MediaAttachments";
+import {
+  burnMasks,
+  OcclusionEditor,
+  recallMask,
+  rememberMask,
+  type Rect,
+} from "./ImageOcclusion";
 import { MediaTextarea } from "./MediaTextarea";
-import { Button, Icon } from "./ui";
+import { Button, Icon, useToast } from "./ui";
 
 export interface CardDraft {
   front: string;
@@ -73,6 +80,14 @@ export const recallChapter = (): string => {
  * pre-filled: something applied on your behalf has to be visible, and one
  * click from gone.
  */
+/** Matches the server's own limit, so a tag can never fail validation. */
+export const MAX_TAG_LENGTH = 60;
+const MAX_TAGS = 30;
+
+/** Trim, lowercase, hyphenate, and cut to a length the API will accept. */
+export const normalizeTag = (raw: string) =>
+  raw.trim().toLowerCase().replace(/\s+/g, "-").slice(0, MAX_TAG_LENGTH);
+
 export const rememberTags = (tags: string[]) => {
   try {
     localStorage.setItem(LAST_TAGS_KEY, JSON.stringify(tags.slice(0, 10)));
@@ -85,7 +100,10 @@ export const recallTags = (): string[] => {
   try {
     const raw = localStorage.getItem(LAST_TAGS_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.filter((t) => typeof t === "string") : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((t) => typeof t === "string" && t.length <= MAX_TAG_LENGTH)
+      .slice(0, MAX_TAGS);
   } catch {
     return [];
   }
@@ -111,6 +129,7 @@ export function CardForm({
   showChapterPicker?: boolean;
   onSubmit?: () => void;
 }) {
+  const { push } = useToast();
   const [showMore, setShowMore] = useState(!!(draft.hint || draft.notes));
   const [tagInput, setTagInput] = useState("");
   const frontRef = useRef<HTMLTextAreaElement>(null);
@@ -144,9 +163,90 @@ export function CardForm({
     side: "back",
   });
 
+  /* ---------------------------------------------------------------- *
+   * Blocking parts of an image out
+   *
+   * Masking produces a second image, so the two halves of the card stay
+   * ordinary attachments: masked on the front, original on the back. The
+   * pairing is held here only while the form is open — `originalOf` is what
+   * lets the tick move the full image on and off the back without a re-upload.
+   * ---------------------------------------------------------------- */
+  const [masking, setMasking] = useState<{ source: Attachment; rects: Rect[] } | null>(
+    null,
+  );
+  const [burning, setBurning] = useState(false);
+  const [originalOf, setOriginalOf] = useState<Record<string, Attachment>>({});
+
+  const frontImages = draft.attachments.filter(
+    (a) => a.side === "front" && a.kind === "image",
+  );
+  const maskedFront = frontImages.find((a) => originalOf[a.id]);
+  const original = maskedFront ? originalOf[maskedFront.id] : undefined;
+  const answerShowsOriginal =
+    !!original && draft.attachments.some((a) => a.side === "back" && a.id === original.id);
+
+  /** Open the editor on an image, restoring whatever was drawn on it before. */
+  const startMasking = (source: Attachment) => {
+    const remembered = recallMask(source.id);
+    setMasking({
+      source: originalOf[source.id] ?? source,
+      rects: remembered?.rects ?? [],
+    });
+  };
+
+  const applyMask = async (rects: Rect[]) => {
+    if (!masking) return;
+    const source = masking.source;
+    setBurning(true);
+    try {
+      const blob = await burnMasks(source.url, rects);
+      const file = new File([blob], `blocked-${source.name.replace(/\.\w+$/, "")}.png`, {
+        type: "image/png",
+      });
+      // Snapshot before awaiting: the uploader appends the new file through
+      // `onChange` itself, and `draftRef` only catches up on the next render —
+      // so reading it afterwards would silently drop the masked image.
+      const before = draftRef.current.attachments;
+      const [added] = await front.upload([file]);
+      if (!added) return;
+
+      // Swap the masked image in for whatever it was made from, and offer the
+      // original as the answer — which is the whole point of doing this.
+      const next = [
+        ...before.filter((a) => !(a.side === "front" && a.id === source.id)),
+        { ...added, side: "front" as const },
+      ];
+      if (!before.some((a) => a.side === "back" && a.id === source.id)) {
+        next.push({ ...source, side: "back" as const });
+      }
+      onChange({ ...draftRef.current, attachments: next });
+
+      setOriginalOf((m) => ({ ...m, [added.id]: source }));
+      rememberMask(added.id, source.url, rects);
+    } catch (err) {
+      push(err instanceof Error ? err.message : "Couldn't block out the image", "error");
+    } finally {
+      setBurning(false);
+      setMasking(null);
+    }
+  };
+
+  /** The tick above Back: keep the untouched image as the answer, or don't. */
+  const setAnswerShowsOriginal = (on: boolean) => {
+    if (!original) return;
+    set(
+      "attachments",
+      on
+        ? [...draft.attachments, { ...original, side: "back" as const }]
+        : draft.attachments.filter((a) => !(a.side === "back" && a.id === original.id)),
+    );
+  };
+
   const commitTag = () => {
-    const t = tagInput.trim().toLowerCase().replace(/\s+/g, "-");
-    if (t && !draft.tags.includes(t)) set("tags", [...draft.tags, t]);
+    const t = normalizeTag(tagInput);
+    if (t && !draft.tags.includes(t) && draft.tags.length < MAX_TAGS) {
+      set("tags", [...draft.tags, t]);
+    }
     setTagInput("");
   };
 
@@ -236,6 +336,7 @@ export function CardForm({
             id="card-tags"
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
+            maxLength={MAX_TAG_LENGTH}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === ",") {
                 e.preventDefault();
@@ -338,11 +439,26 @@ export function CardForm({
             onChange={(a) => set("attachments", a)}
             side="front"
             compact
+            onEditImage={startMasking}
+            editImageLabel="Block out"
           />
         </div>
       </div>
 
       <div>
+        {original && (
+          <label className="flex items-center gap-2 mb-2 cursor-pointer anim-fade w-fit">
+            <input
+              type="checkbox"
+              checked={answerShowsOriginal}
+              onChange={(e) => setAnswerShowsOriginal(e.target.checked)}
+              className="accent-[var(--accent)] w-4 h-4"
+            />
+            <span className="text-[13px] text-[var(--text-muted)]">
+              Show the full image as the answer
+            </span>
+          </label>
+        )}
         <label
           htmlFor="card-back"
           className="block text-[13px] font-medium text-[var(--text-muted)] mb-1.5"
@@ -418,6 +534,17 @@ export function CardForm({
           </div>
 
         </div>
+      )}
+
+      {masking && (
+        <OcclusionEditor
+          open
+          src={masking.source.url}
+          initialRects={masking.rects}
+          busy={burning}
+          onCancel={() => setMasking(null)}
+          onSave={applyMask}
+        />
       )}
     </div>
   );
