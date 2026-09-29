@@ -51,7 +51,7 @@ export const POST = handler(async (ctx) => {
     });
   }
 
-  const result = restoreBackup(parsed, input.mode);
+  const result = await restoreBackup(parsed, input.mode);
 
   logEvent({
     actor: ctx.actor,

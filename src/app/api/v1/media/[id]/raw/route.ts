@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import { authenticate } from "@/lib/auth";
-import { getMedia, mediaPath } from "@/lib/media";
+import path from "node:path";
+import { MEDIA_DIR } from "@/lib/db-node";
+import { getMedia } from "@/lib/media";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +20,9 @@ export async function GET(
   const row = getMedia(id);
   if (!row) return new Response("Not found", { status: 404 });
 
-  const filePath = mediaPath(row);
+  // Server-only route: it streams from disk so <audio> and <video> can seek
+  // with range requests. `filename` is always a uuid we generated.
+  const filePath = path.join(MEDIA_DIR, path.basename(row.filename));
   let stat: fs.Stats;
   try {
     stat = fs.statSync(filePath);

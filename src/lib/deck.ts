@@ -1,9 +1,7 @@
-import { MEDIA_DIR } from "./db-node";
 import { unzipSync, zipSync } from "fflate";
-import fs from "node:fs";
-import path from "node:path";
 import { clozeIndices } from "./cloze";
 import { getDb } from "./db";
+import { mediaStore } from "./mediaStore";
 import { hydrate } from "./repo";
 import type { CardRow, Chapter, Course } from "./types";
 
@@ -134,27 +132,28 @@ function collect(
   };
 }
 
-export function buildDeckZip(
+export async function buildDeckZip(
   course: Course,
   chapters: Chapter[],
   scope: "course" | "chapter",
-): { bytes: Buffer; deck: DeckFile; mediaCount: number } {
+): Promise<{ bytes: Buffer; deck: DeckFile; mediaCount: number }> {
   const { deck, mediaFiles } = collect(course, chapters, scope);
 
   const entries: Record<string, Uint8Array> = {
     "deck.json": new TextEncoder().encode(JSON.stringify(deck, null, 2)),
   };
 
+  const store = mediaStore();
   let mediaCount = 0;
   for (const filename of mediaFiles) {
-    try {
-      const bytes = fs.readFileSync(path.join(MEDIA_DIR, path.basename(filename)));
-      entries[`media/${filename}`] = new Uint8Array(bytes);
-      mediaCount++;
-    } catch {
-      // A file missing from disk shouldn't sink the whole export; the cards
-      // still carry their text, and the reference simply won't resolve.
+    const bytes = await store.read(filename);
+    if (!bytes) {
+      // Missing bytes shouldn't sink the export: the cards still carry their
+      // text, and the reference simply won't resolve on the other side.
+      continue;
     }
+    entries[`media/${filename}`] = bytes;
+    mediaCount++;
   }
 
   return { bytes: Buffer.from(zipSync(entries)), deck, mediaCount };

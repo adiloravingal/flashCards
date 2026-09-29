@@ -1,8 +1,6 @@
-import { MEDIA_DIR } from "./db-node";
 import { unzipSync, zipSync } from "fflate";
-import fs from "node:fs";
-import path from "node:path";
 import { getDb } from "./db";
+import { mediaStore } from "./mediaStore";
 import { MIGRATIONS } from "./schema";
 
 /**
@@ -23,6 +21,24 @@ import { MIGRATIONS } from "./schema";
  * someone, put on a USB stick or sync to a phone, and it must not carry the
  * credential that grants full read/write access to your collection.
  */
+
+/**
+ * Where a pre-restore safety copy gets written.
+ *
+ * Registered per environment — a file beside the database on a server, an
+ * IndexedDB entry on a phone. If nothing is registered the restore still
+ * runs, and the caller is told no copy was taken.
+ */
+export type SafetyWriter = (
+  filename: string,
+  bytes: Uint8Array,
+) => Promise<string | null>;
+
+let safetyWriter: SafetyWriter | null = null;
+
+export function registerSafetyWriter(writer: SafetyWriter): void {
+  safetyWriter = writer;
+}
 
 export const BACKUP_FORMAT = "flashcards.io/backup";
 export const BACKUP_VERSION = 1;
@@ -61,10 +77,10 @@ const columnsOf = (table: string): string[] =>
  * Writing
  * ========================================================================== */
 
-export function buildBackup(includeHistory = true): {
+export async function buildBackup(includeHistory = true): Promise<{
   bytes: Buffer;
   meta: BackupFile;
-} {
+}> {
   const db = getDb();
   const tables: BackupFile["tables"] = {};
   const counts: Record<string, number> = {};
@@ -86,20 +102,15 @@ export function buildBackup(includeHistory = true): {
   // afterwards mutates an object that has already been turned into JSON, so
   // the file on disk would forever claim zero media files while actually
   // containing them.
+  const store = mediaStore();
   const mediaEntries: Record<string, Uint8Array> = {};
   let mediaFiles = 0;
   for (const row of (tables.media ?? []) as { filename?: string }[]) {
     if (!row.filename) continue;
-    try {
-      const bytes = fs.readFileSync(
-        path.join(MEDIA_DIR, path.basename(row.filename)),
-      );
-      mediaEntries[`media/${row.filename}`] = new Uint8Array(bytes);
-      mediaFiles++;
-    } catch {
-      // Missing on disk — the row still restores, the reference just won't
-      // resolve. Better than refusing to back up everything else.
-    }
+    const bytes = await store.read(row.filename);
+    if (!bytes) continue; // row restores; the reference just won't resolve
+    mediaEntries[`media/${row.filename}`] = bytes;
+    mediaFiles++;
   }
   counts.mediaFiles = mediaFiles;
 
@@ -258,28 +269,11 @@ function restoreTable(
  * two — not every restore you have ever done quietly filling the disk with
  * copies of your entire collection.
  */
-const SAFETY_COPIES_KEPT = 3;
 
-function pruneSafetyBackups(): void {
-  try {
-    const dir = path.dirname(MEDIA_DIR);
-    const copies = fs
-      .readdirSync(dir)
-      .filter((n) => /^before-restore-\d+\.fcbackup$/.test(n))
-      .sort()
-      .reverse();
-    for (const stale of copies.slice(SAFETY_COPIES_KEPT)) {
-      fs.rmSync(path.join(dir, stale), { force: true });
-    }
-  } catch {
-    /* housekeeping only */
-  }
-}
-
-export function restoreBackup(
+export async function restoreBackup(
   parsed: ParsedBackup,
   mode: RestoreMode,
-): RestoreResult {
+): Promise<RestoreResult> {
   const db = getDb();
   const inserted: Record<string, number> = {};
   const skipped: Record<string, number> = {};
@@ -288,19 +282,16 @@ export function restoreBackup(
   // A restore is the single most dangerous button in the app, and "I picked
   // the wrong file" should cost a minute, not a collection.
   let safetyBackup: string | null = null;
-  if (mode === "replace") {
+  if (mode === "replace" && safetyWriter) {
     try {
-      const { bytes } = buildBackup(true);
-      const target = path.join(
-        path.dirname(MEDIA_DIR),
+      const { bytes } = await buildBackup(true);
+      safetyBackup = await safetyWriter(
         `before-restore-${Date.now()}.fcbackup`,
+        new Uint8Array(bytes),
       );
-      fs.writeFileSync(target, bytes);
-      safetyBackup = path.basename(target);
-      pruneSafetyBackups();
     } catch {
-      // If we can't write the safety copy we carry on — but the caller is
-      // told, so the UI can say so plainly.
+      // If the safety copy fails we carry on, but the caller is told so the
+      // UI can say plainly that this one is not undoable.
       safetyBackup = null;
     }
   }
@@ -338,10 +329,10 @@ export function restoreBackup(
   // Media files last: a half-written image is recoverable, a half-written
   // database is not.
   let mediaRestored = 0;
-  fs.mkdirSync(MEDIA_DIR, { recursive: true });
+  const restoreStore = mediaStore();
   for (const [name, bytes] of parsed.media) {
     try {
-      fs.writeFileSync(path.join(MEDIA_DIR, path.basename(name)), bytes);
+      await restoreStore.write(name, bytes);
       mediaRestored++;
     } catch {
       /* one unwritable file shouldn't abort the restore */

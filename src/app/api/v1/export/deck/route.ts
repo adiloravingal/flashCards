@@ -44,7 +44,7 @@ export const GET = handler(async (ctx) => {
     );
   }
 
-  const { bytes, deck, mediaCount } = buildDeckZip(course, chapters, scope);
+  const { bytes, deck, mediaCount } = await buildDeckZip(course, chapters, scope);
   const cards = deck.chapters.reduce((n, c) => n + c.cards.length, 0);
 
   if (cards === 0) {

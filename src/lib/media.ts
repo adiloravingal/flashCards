@@ -1,8 +1,23 @@
-import { MEDIA_DIR } from "./db-node";
-import { createHash } from "node:crypto";
-import fs from "node:fs/promises";
-import path from "node:path";
 import { getDb, newId, now } from "./db";
+import { mediaStore } from "./mediaStore";
+
+/** `".png"` from `"cat.png"`. Avoids node:path so this runs on a phone too. */
+function extensionOf(filename: string): string {
+  const dot = filename.lastIndexOf(".");
+  const slash = Math.max(filename.lastIndexOf("/"), filename.lastIndexOf("\\"));
+  return dot > slash && dot !== -1 ? filename.slice(dot) : "";
+}
+
+/** SHA-256 via Web Crypto — present in browsers and in Node 18+. */
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    bytes.slice().buffer as ArrayBuffer,
+  );
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 import type { MediaKind, MediaRow } from "./types";
 
 export const MAX_UPLOAD_BYTES =
@@ -45,7 +60,7 @@ export function resolveMime(declared: string, filename: string): string {
   if (d && d !== "application/octet-stream" && d !== "binary/octet-stream") {
     return declared;
   }
-  const ext = path.extname(filename).toLowerCase();
+  const ext = extensionOf(filename).toLowerCase();
   return MIME_BY_EXT[ext] ?? "application/octet-stream";
 }
 
@@ -57,7 +72,7 @@ export function kindFor(mime: string, filename: string): MediaKind {
   if (m === "application/pdf") return "pdf";
 
   // Some browsers send an empty or generic mime; fall back to the extension.
-  const ext = path.extname(filename).toLowerCase();
+  const ext = extensionOf(filename).toLowerCase();
   if ([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif", ".bmp"].includes(ext))
     return "image";
   if ([".mp3", ".wav", ".ogg", ".m4a", ".flac", ".aac", ".opus"].includes(ext))
@@ -69,7 +84,7 @@ export function kindFor(mime: string, filename: string): MediaKind {
 
 /** Strip anything that could escape the media directory. */
 function safeExtension(filename: string): string {
-  const ext = path.extname(filename).toLowerCase();
+  const ext = extensionOf(filename).toLowerCase();
   return /^\.[a-z0-9]{1,10}$/.test(ext) ? ext : "";
 }
 
@@ -93,7 +108,7 @@ export async function saveUpload(file: File): Promise<SaveResult> {
     );
   }
 
-  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  const sha256 = await sha256Hex(new Uint8Array(bytes));
   const db = getDb();
 
   const existing = db
@@ -101,12 +116,10 @@ export async function saveUpload(file: File): Promise<SaveResult> {
     .get(sha256) as MediaRow | undefined;
   if (existing) {
     // Confirm the file is genuinely still on disk before trusting the row.
-    try {
-      await fs.access(path.join(MEDIA_DIR, existing.filename));
+    if (await mediaStore().read(existing.filename)) {
       return { media: existing, deduped: true };
-    } catch {
-      /* row is stale — fall through and rewrite the bytes */
     }
+    // Row is stale — the bytes are gone. Fall through and write them again.
   }
 
   const originalName = file.name || "upload";
@@ -115,8 +128,7 @@ export async function saveUpload(file: File): Promise<SaveResult> {
   const id = newId();
   const filename = `${id}${safeExtension(originalName)}`;
 
-  await fs.mkdir(MEDIA_DIR, { recursive: true });
-  await fs.writeFile(path.join(MEDIA_DIR, filename), bytes);
+  await mediaStore().write(filename, new Uint8Array(bytes));
 
   const row: MediaRow = {
     id,
@@ -143,10 +155,6 @@ export function getMedia(id: string): MediaRow | undefined {
     | undefined;
 }
 
-export function mediaPath(row: MediaRow): string {
-  // `filename` is always `<uuid><ext>` that we generated, never user input.
-  return path.join(MEDIA_DIR, path.basename(row.filename));
-}
 
 /** Delete media rows (and files) that no card references any more. */
 export async function collectOrphanedMedia(): Promise<number> {
@@ -161,7 +169,7 @@ export async function collectOrphanedMedia(): Promise<number> {
   let removed = 0;
   for (const m of orphans) {
     try {
-      await fs.unlink(mediaPath(m));
+      await mediaStore().remove(m.filename);
     } catch {
       /* already gone */
     }

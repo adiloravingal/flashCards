@@ -17,7 +17,7 @@ export const GET = handler(async (ctx) => {
 
   let built;
   try {
-    built = buildBackup(includeHistory);
+    built = await buildBackup(includeHistory);
   } catch (err) {
     return fail(
       500,

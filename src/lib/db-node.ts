@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { getAgentKey, registerDatabase, runMigrations, setAgentKey } from "./db";
+import { registerSafetyWriter } from "./backup";
+import { registerMediaStore } from "./mediaStore";
 import { openNodeDatabase } from "./sqlite/node";
 import type { SqliteDb } from "./sqlite/types";
 
@@ -67,6 +69,55 @@ export function rotateAgentKey(): string {
   writeKeyFile(key);
   return key;
 }
+
+/** Server media: plain files in data/media, one per upload. */
+registerMediaStore({
+  async read(filename) {
+    try {
+      return new Uint8Array(
+        fs.readFileSync(path.join(MEDIA_DIR, path.basename(filename))),
+      );
+    } catch {
+      return null;
+    }
+  },
+  async write(filename, bytes) {
+    fs.mkdirSync(MEDIA_DIR, { recursive: true });
+    fs.writeFileSync(path.join(MEDIA_DIR, path.basename(filename)), bytes);
+  },
+  async remove(filename) {
+    try {
+      fs.rmSync(path.join(MEDIA_DIR, path.basename(filename)), { force: true });
+    } catch {
+      /* already gone */
+    }
+  },
+});
+
+/**
+ * Pre-restore safety copies land next to the database, newest three kept.
+ * They exist so a mistaken restore is recoverable, which needs the last one or
+ * two — not every restore ever done quietly filling the disk with copies of
+ * the entire collection.
+ */
+const SAFETY_COPIES_KEPT = 3;
+
+registerSafetyWriter(async (filename, bytes) => {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(path.join(DATA_DIR, filename), bytes);
+  try {
+    const stale = fs
+      .readdirSync(DATA_DIR)
+      .filter((n) => /^before-restore-\d+\.fcbackup$/.test(n))
+      .sort()
+      .reverse()
+      .slice(SAFETY_COPIES_KEPT);
+    for (const name of stale) fs.rmSync(path.join(DATA_DIR, name), { force: true });
+  } catch {
+    /* housekeeping only */
+  }
+  return filename;
+});
 
 // Side effect: opening on import is what makes `getDb()` safe everywhere.
 const globalForNode = globalThis as unknown as { __fcNodeDbOpen?: boolean };
