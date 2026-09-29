@@ -33,7 +33,17 @@ fi
 # validator there listing every API handler. With the handlers parked it fails
 # to resolve them, so clear the generated types first — `next dev` rebuilds it.
 rm -rf .next-device out .next/dev/types .next/types
-FC_TARGET=device npx next build
+
+# SQLite ships as a static asset rather than a bundled dependency — see the
+# comment in src/lib/sqlite/wasm.ts for why.
+echo "  staging SQLite WASM into public/sqlite"
+rm -rf public/sqlite && mkdir -p public/sqlite
+cp node_modules/@sqlite.org/sqlite-wasm/dist/index.mjs \
+   node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3.wasm \
+   node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3-worker1.mjs \
+   node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3-opfs-async-proxy.js \
+   public/sqlite/
+FC_TARGET=device NEXT_PUBLIC_FC_TARGET=device npx next build
 
 # Next 16 writes the exported site straight into distDir. Normalise it to
 # out/, which is what capacitor.config.ts points at.

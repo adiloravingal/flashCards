@@ -7,7 +7,7 @@ const ok = (n: string, c: boolean, x?: unknown) => {
     : (fail++, console.log("  \x1b[31m✗\x1b[0m", n, "->", JSON.stringify(x)?.slice(0, 200)));
 };
 
-await initWasmSqlite();
+await initWasmSqlite(new URL("node_modules/@sqlite.org/sqlite-wasm/dist/node.mjs", `file://${process.cwd()}/`).href);
 let db = openWasmDatabase();
 
 console.log("\n\x1b[1mREAL SCHEMA\x1b[0m");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { apiFetch } from "@/lib/apiFetch";
 import { api, cx } from "@/lib/client";
 import { Button, Icon, Modal, useToast } from "./ui";
 
@@ -47,7 +48,7 @@ export function BackupPanel() {
   const exportBackup = async () => {
     setExporting(true);
     try {
-      const res = await fetch("/api/v1/backup");
+      const res = await apiFetch("/api/v1/backup");
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as
           | { error?: { message?: string } }
@@ -80,7 +81,7 @@ export function BackupPanel() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch("/api/v1/backup/analyze", {
+      const res = await apiFetch("/api/v1/backup/analyze", {
         method: "POST",
         body: form,
       });

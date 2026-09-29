@@ -48,13 +48,24 @@ interface Sqlite3 {
 
 let sqlite3: Sqlite3 | null = null;
 
+/**
+ * Where the SQLite module is loaded from at runtime.
+ *
+ * It is fetched as a static asset rather than bundled. The package spawns a
+ * Worker from a URL it builds at runtime — for an OPFS proxy this app does not
+ * use — and no bundler can prove that path is dead, so bundling it fails.
+ * Copying `dist/` into public/sqlite and importing by URL sidesteps the
+ * analysis entirely, and keeps the .wasm next to the .mjs that looks for it.
+ */
+const DEFAULT_MODULE_URL = "/sqlite/index.mjs";
+
 /** Load the WASM module once. The only await in the whole data layer. */
-export async function initWasmSqlite(): Promise<void> {
+export async function initWasmSqlite(moduleUrl = DEFAULT_MODULE_URL): Promise<void> {
   if (sqlite3) return;
-  const mod = await import("@sqlite.org/sqlite-wasm");
-  const factory = (mod as unknown as { default: (o?: unknown) => Promise<Sqlite3> })
-    .default;
-  sqlite3 = await factory({ print: () => {}, printErr: () => {} });
+  const mod = (await import(
+    /* webpackIgnore: true */ /* turbopackIgnore: true */ moduleUrl
+  )) as { default: (o?: unknown) => Promise<Sqlite3> };
+  sqlite3 = await mod.default({ print: () => {}, printErr: () => {} });
 }
 
 /**

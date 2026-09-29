@@ -1,5 +1,6 @@
 import { clozeIndices, hasCloze } from "./cloze";
 import { getDb, getSettings, newId, now } from "./db";
+import { mediaUrlFor } from "./mediaStore";
 import { logEvent, type Actor } from "./log";
 import { applyRating, freshState, stateFromRow } from "./scheduler";
 import type {
@@ -57,7 +58,7 @@ function mediaFor(cardIds: string[]): Map<string, CardMediaRef[]> {
     const { card_id, ...rest } = r;
     const ref: CardMediaRef = {
       ...rest,
-      url: `/api/v1/media/${rest.id}/raw`,
+      url: mediaUrlFor(rest.filename, rest.id),
     } as CardMediaRef;
     const list = map.get(card_id) ?? [];
     list.push(ref);

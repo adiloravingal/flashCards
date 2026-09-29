@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { apiFetch } from "./apiFetch";
 
 /* ==========================================================================
  * A tiny typed fetch wrapper. Every API response is {ok,data} | {ok,error},
@@ -30,7 +31,7 @@ export async function api<T = unknown>(
     body = JSON.stringify(json);
   }
 
-  const res = await fetch(`/api/v1${path}`, { ...rest, headers, body });
+  const res = await apiFetch(`/api/v1${path}`, { ...rest, headers, body });
 
   let payload: unknown;
   try {

@@ -10,6 +10,7 @@ import {
   Spinner,
   useToast,
 } from "@/components/ui";
+import { apiFetch } from "@/lib/apiFetch";
 import { api, cx, useApi } from "@/lib/client";
 import type { Course } from "@/lib/types";
 
@@ -115,7 +116,7 @@ export default function ImportPage() {
     try {
       const form = new FormData();
       form.append("file", f);
-      const res = await fetch("/api/v1/import/deck/analyze", {
+      const res = await apiFetch("/api/v1/import/deck/analyze", {
         method: "POST",
         body: form,
       });
@@ -169,7 +170,7 @@ export default function ImportPage() {
     try {
       const form = new FormData();
       form.append("file", f);
-      const res = await fetch("/api/v1/import/anki/analyze", {
+      const res = await apiFetch("/api/v1/import/anki/analyze", {
         method: "POST",
         body: form,
       });
@@ -230,7 +231,7 @@ export default function ImportPage() {
     try {
       const form = new FormData();
       form.append("file", f);
-      const res = await fetch("/api/v1/import/analyze", {
+      const res = await apiFetch("/api/v1/import/analyze", {
         method: "POST",
         body: form,
       });

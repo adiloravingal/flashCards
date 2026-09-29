@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/apiFetch";
+
 import { useState } from "react";
 import { Button, Icon, useToast } from "./ui";
 
@@ -32,7 +34,7 @@ export function ExportDeckButton({
       const query = chapterId
         ? `chapterId=${encodeURIComponent(chapterId)}`
         : `courseId=${encodeURIComponent(courseId ?? "")}`;
-      const res = await fetch(`/api/v1/export/deck?${query}`);
+      const res = await apiFetch(`/api/v1/export/deck?${query}`);
 
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as

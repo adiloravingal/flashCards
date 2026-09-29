@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { apiFetch } from "@/lib/apiFetch";
 import { cx } from "@/lib/client";
 import { filesFromTransfer, prepareForUpload } from "@/lib/clipboard";
 import type { CardMediaRef, MediaKind } from "@/lib/types";
@@ -77,7 +78,7 @@ export function useAttachmentUpload({
         const form = new FormData();
         for (const f of list) form.append("file", f);
 
-        const res = await fetch("/api/v1/media", { method: "POST", body: form });
+        const res = await apiFetch("/api/v1/media", { method: "POST", body: form });
         const payload = (await res.json()) as
           | {
               ok: true;
