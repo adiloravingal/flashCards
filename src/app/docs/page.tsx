@@ -24,6 +24,7 @@ const SECTIONS = [
   { id: "import", label: "Importing spreadsheets" },
   { id: "sharing", label: "Sharing a course or chapter" },
   { id: "devices", label: "Using more than one device" },
+  { id: "android", label: "The Android app" },
   { id: "anki", label: "Importing Anki decks" },
   { id: "media", label: "Images, audio & files" },
   { id: "scheduling", label: "How scheduling works" },
@@ -430,6 +431,46 @@ export default function DocsPage() {
               <em>onto</em> loses the progress it made. Pick a direction each
               time — or use <B>Add what&apos;s missing</B>, which never throws
               work away.
+            </Callout>
+          </Doc>
+
+          <Doc id="android" title="The Android app">
+            <P>
+              There is an Android build of this same app. It runs entirely on
+              the phone — no server, no network, nothing to keep running at
+              home. Your cards live in the app&apos;s own storage.
+            </P>
+            <List
+              items={[
+                <>
+                  <B>Everything you study with is there:</B> courses, chapters,
+                  cloze cards, images and audio, scheduling, progress and
+                  search.
+                </>,
+                <>
+                  <B>Move cards across with a backup.</B> Export a{" "}
+                  <C>.fcbackup</C> here, open it on the phone, restore. It
+                  works in either direction.
+                </>,
+                <>
+                  <B>No AI agent API on the phone.</B> Nothing is listening on
+                  a port there, so <C>/api/v1</C> doesn&apos;t exist. Write
+                  cards with an agent on the machine running the server, then
+                  carry them over.
+                </>,
+                <>
+                  <B>It is not sync.</B> Restoring in one direction replaces
+                  what was on the receiving device, so pick a direction each
+                  time — or use <B>Add what&apos;s missing</B>, which never
+                  discards work.
+                </>,
+              ]}
+            />
+            <Callout>
+              The app isn&apos;t on the Play Store, so Android will ask you to
+              allow installing from wherever you downloaded it, and may warn
+              that the developer is unknown. That is what sideloading looks
+              like; it is not a sign anything is wrong.
             </Callout>
           </Doc>
 
