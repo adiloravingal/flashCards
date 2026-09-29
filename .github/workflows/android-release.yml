@@ -1,0 +1,95 @@
+name: Android release
+
+# Tag a version and this publishes a downloadable APK:
+#   git tag v1.0.0 && git push --tags
+#
+# The signing keystore never lives in the repo. Add these four repository
+# secrets under Settings → Secrets and variables → Actions:
+#
+#   ANDROID_KEYSTORE_BASE64   base64 -i release.jks | pbcopy
+#   ANDROID_KEYSTORE_PASSWORD
+#   ANDROID_KEY_ALIAS
+#   ANDROID_KEY_PASSWORD
+#
+# Without them the workflow still builds, just unsigned — useful for checking
+# a pull request compiles.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # The secrets context is not dependable inside a step-level `if`, so the
+      # decision is hoisted into an env var here.
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      # GitHub's runners already ship the Android SDK; this only pins the JDK.
+      # Android Gradle Plugin does not support JDK 25 yet.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - run: npm ci
+
+      - name: Build the static device bundle
+        run: ./scripts/build-device.sh
+
+      - name: Copy the bundle into the Android project
+        run: npx cap sync android
+
+      - name: Restore the signing key
+        if: env.HAS_KEYSTORE == 'true'
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > release.jks
+          cat > android/key.properties <<EOF
+          storeFile=../../release.jks
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
+
+      - name: Build the APK
+        run: ./gradlew assembleRelease --no-daemon
+        working-directory: android
+
+      - name: Name it after the tag
+        id: apk
+        run: |
+          VERSION="${GITHUB_REF_NAME:-dev}"
+          SRC=android/app/build/outputs/apk/release/app-release.apk
+          [ -f "$SRC" ] || SRC=android/app/build/outputs/apk/release/app-release-unsigned.apk
+          cp "$SRC" "flashCards-${VERSION}.apk"
+          echo "path=flashCards-${VERSION}.apk" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: ${{ steps.apk.outputs.path }}
+
+      - name: Attach it to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.apk.outputs.path }}
+          body: |
+            Install on Android: download the `.apk` below, tap it, and allow
+            installing from this source when asked. Play Protect may warn that
+            the developer is unknown — that is expected for an app outside the
+            Play Store.
+
+            Runs entirely offline. No account, no server.

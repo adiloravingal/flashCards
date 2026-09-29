@@ -112,6 +112,51 @@ What they do:
 
 They never touch an existing database, media folder or API key.
 
+## Android
+
+The same codebase runs as a standalone Android app. No server, no network —
+the database goes with it.
+
+```bash
+./scripts/build-device.sh     # static bundle, no route handlers
+npx cap sync android          # copy it into the Android project
+cd android && ./gradlew assembleRelease
+```
+
+The APK lands at `android/app/build/outputs/apk/release/app-release.apk`.
+Use `assembleRelease`, not `bundleRelease` — an `.aab` is for the Play Store
+and cannot be sideloaded.
+
+**Signing.** Create a keystore once and point `android/key.properties` at it;
+both are gitignored. Losing the keystore means never being able to update an
+installed app, so back it up somewhere real.
+
+```bash
+keytool -genkeypair -v -keystore release.jks -alias flashcards \
+  -keyalg RSA -keysize 2048 -validity 10000
+```
+
+**Publishing.** Tag a version and GitHub Actions builds and attaches the APK
+to the release, so there is a URL to send rather than a file:
+
+```bash
+git tag v1.0.0 && git push --tags
+```
+
+That needs four repository secrets — see the comment at the top of
+`.github/workflows/android-release.yml`.
+
+**What the device build does differently.** There is no HTTP server on a
+phone, so `api()` dispatches to a local handler instead of `fetch`, and that
+handler calls the same `repo.ts` the server routes call. SQLite is the
+official WASM build, held in memory and written back to IndexedDB as one
+file. Media lives in IndexedDB too, deliberately outside the SQLite file,
+which is rewritten whole on every change.
+
+The `/api/v1` agent API does not exist on device — there is nothing listening.
+Android is for studying; author cards on the server build and move them across
+with a `.fcbackup`.
+
 ## Checking it still works
 
 ```bash
