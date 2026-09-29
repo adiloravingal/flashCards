@@ -89,3 +89,9 @@ Thumbs.db
 public/sqlite/
 data-backup-*/
 .fc-sqlite-probe.cjs
+.session-context.md
+
+# Scratch test scripts written during a session. Never part of the app.
+_*.mjs
+_*.mts
+_*.js

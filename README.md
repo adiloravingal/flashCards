@@ -157,6 +157,20 @@ The `/api/v1` agent API does not exist on device — there is nothing listening.
 Android is for studying; author cards on the server build and move them across
 with a `.fcbackup`.
 
+## Using it from Claude
+
+There is an MCP server in `mcp/`, so Claude can add and search cards from an
+ordinary conversation rather than through the terminal. It is a thin layer over
+the same `/api/v1` the web UI uses, so agent writes get the same validation,
+deduplication and activity-log entry.
+
+It exposes six tools and deliberately no destructive ones — no delete, no
+restore, no maintenance. See `mcp/README.md` for the config snippet.
+
+You do not need it to use an agent: pointing Claude Code at
+`http://localhost:3939/api/v1/spec` is enough for it to work the whole API out
+on its own. MCP is for Claude Desktop, where there is no terminal.
+
 ## Checking it still works
 
 ```bash

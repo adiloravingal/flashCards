@@ -216,8 +216,17 @@ async function main() {
 
   section("Review loop");
   {
-    const q = await get(`/review/queue?chapterId=${chapterId}`);
+    // mode=new deliberately, not the default "due" queue. That one tops up
+    // with new cards only within the day's remaining budget, so on a day the
+    // user has already studied their limit these freshly-made cards would be
+    // held back — correct behaviour that would make this suite fail for the
+    // wrong reason.
+    const q = await get(`/review/queue?chapterId=${chapterId}&mode=new`);
     ok("queue returns cards", q.cards.length === 3, q.cards.length);
+    if (q.cards.length === 0) {
+      ok("cannot test the review loop without a queue", false, q);
+      throw new Error("Review queue was empty; the checks below need a card.");
+    }
     ok("cards carry interval previews", !!q.cards[0]?.preview?.["3"]);
 
     const card = q.cards[0];
