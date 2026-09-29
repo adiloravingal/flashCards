@@ -11,18 +11,16 @@ any kind.
 
 ```bash
 npm install
-npm run dev
+npm run build
+npm start
 ```
 
 Open <http://localhost:3939>. The database and media folder are created on first
 boot, along with an API key at `data/agent-key.txt`.
 
-For a real deployment:
-
-```bash
-npm run build
-npm start
-```
+That is the build to use day to day. If you are changing the code, `npm run dev`
+gives you hot reloading on <http://localhost:3000> instead — a separate port, so
+you can leave the real app running on 3939 while you work on it.
 
 Or with Docker (`data/` is mounted as a volume, so upgrades never touch your
 cards):

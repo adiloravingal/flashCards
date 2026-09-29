@@ -203,13 +203,16 @@ try {
 Write-Step "Ready"
 Write-Host ""
 Write-Host "  Start it:"
-Write-Host "    npm run dev" -ForegroundColor White -NoNewline
-Write-Host "      for working on it" -ForegroundColor DarkGray
 Write-Host "    npm run build; npm start" -ForegroundColor White -NoNewline
 Write-Host "   for everyday use" -ForegroundColor DarkGray
+Write-Host "    npm run dev" -ForegroundColor White -NoNewline
+Write-Host "      for working on it" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "  Then open:"
-Write-Host "    http://localhost:3939"
+Write-Host "    http://localhost:3939" -NoNewline
+Write-Host "   (npm start)" -ForegroundColor DarkGray
+Write-Host "    http://localhost:3000" -NoNewline
+Write-Host "   (npm run dev)" -ForegroundColor DarkGray
 if ($ip) {
     Write-Host "    http://${ip}:3939" -NoNewline
     Write-Host "   (from your phone or tablet, same network)" -ForegroundColor DarkGray

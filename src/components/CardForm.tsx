@@ -29,7 +29,7 @@ export const emptyDraft = (chapterId = ""): CardDraft => ({
   back: "",
   hint: "",
   notes: "",
-  tags: [],
+  tags: recallTags(),
   starred: false,
   attachments: [],
   chapterId,
@@ -48,6 +48,7 @@ export const draftFromCard = (card: Card): CardDraft => ({
 
 /** Remembers the last chapter you wrote into, so the next card needs no setup. */
 const LAST_CHAPTER_KEY = "fc-last-chapter";
+const LAST_TAGS_KEY = "fc-last-tags";
 export const rememberChapter = (id: string) => {
   try {
     localStorage.setItem(LAST_CHAPTER_KEY, id);
@@ -60,6 +61,33 @@ export const recallChapter = (): string => {
     return localStorage.getItem(LAST_CHAPTER_KEY) ?? "";
   } catch {
     return "";
+  }
+};
+
+/**
+ * Tags carry over to the next card, and across reloads.
+ *
+ * Cards get written in runs — twenty on one topic, then twenty on another —
+ * so retyping the same tag every time is pure friction. They are shown at the
+ * top rather than hidden in an optional section precisely because they arrive
+ * pre-filled: something applied on your behalf has to be visible, and one
+ * click from gone.
+ */
+export const rememberTags = (tags: string[]) => {
+  try {
+    localStorage.setItem(LAST_TAGS_KEY, JSON.stringify(tags.slice(0, 10)));
+  } catch {
+    /* ignore */
+  }
+};
+
+export const recallTags = (): string[] => {
+  try {
+    const raw = localStorage.getItem(LAST_TAGS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((t) => typeof t === "string") : [];
+  } catch {
+    return [];
   }
 };
 
@@ -83,9 +111,7 @@ export function CardForm({
   showChapterPicker?: boolean;
   onSubmit?: () => void;
 }) {
-  const [showMore, setShowMore] = useState(
-    !!(draft.hint || draft.notes || draft.tags.length),
-  );
+  const [showMore, setShowMore] = useState(!!(draft.hint || draft.notes));
   const [tagInput, setTagInput] = useState("");
   const frontRef = useRef<HTMLTextAreaElement>(null);
 
@@ -170,6 +196,60 @@ export function CardForm({
           }}
         />
       )}
+
+      <div>
+        <div className="flex items-baseline justify-between gap-2 mb-1.5">
+          <label
+            htmlFor="card-tags"
+            className="text-[13px] font-medium text-[var(--text-muted)]"
+          >
+            Tags
+          </label>
+          {draft.tags.length > 0 && (
+            <button
+              type="button"
+              onClick={() => set("tags", [])}
+              className="text-xs text-[var(--text-faint)] hover:text-[var(--again)] transition-colors"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1.5 items-center">
+          {draft.tags.map((t) => (
+            <span
+              key={t}
+              className="inline-flex items-center gap-1 h-6 pl-2 pr-1 rounded-md bg-[var(--accent-soft)] text-[var(--accent)] text-xs font-medium"
+            >
+              {t}
+              <button
+                type="button"
+                onClick={() => set("tags", draft.tags.filter((x) => x !== t))}
+                aria-label={`Remove tag ${t}`}
+                className="hover:opacity-60"
+              >
+                <Icon name="x" className="w-3 h-3" strokeWidth={2.4} />
+              </button>
+            </span>
+          ))}
+          <input
+            id="card-tags"
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === ",") {
+                e.preventDefault();
+                commitTag();
+              } else if (e.key === "Backspace" && !tagInput && draft.tags.length) {
+                set("tags", draft.tags.slice(0, -1));
+              }
+            }}
+            onBlur={commitTag}
+            placeholder={draft.tags.length ? "" : "Type and press Enter"}
+            className="field flex-1 min-w-[10rem] h-8 py-0 text-xs"
+          />
+        </div>
+      </div>
 
       <div>
         <div className="flex items-center justify-between mb-1.5">
@@ -300,7 +380,7 @@ export function CardForm({
           className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors inline-flex items-center gap-1"
         >
           <Icon name="chevronDown" className="w-3.5 h-3.5" />
-          Add hint, notes or tags
+          Add a hint or notes
         </button>
       ) : (
         <div className="space-y-4 pt-1 anim-fade">
@@ -337,48 +417,6 @@ export function CardForm({
             />
           </div>
 
-          <div>
-            <label
-              htmlFor="card-tags"
-              className="block text-[13px] font-medium text-[var(--text-muted)] mb-1.5"
-            >
-              Tags
-            </label>
-            <div className="flex flex-wrap gap-1.5 items-center">
-              {draft.tags.map((t) => (
-                <span
-                  key={t}
-                  className="inline-flex items-center gap-1 h-6 pl-2 pr-1 rounded-md bg-[var(--accent-soft)] text-[var(--accent)] text-xs font-medium"
-                >
-                  {t}
-                  <button
-                    type="button"
-                    onClick={() => set("tags", draft.tags.filter((x) => x !== t))}
-                    aria-label={`Remove tag ${t}`}
-                    className="hover:opacity-60"
-                  >
-                    <Icon name="x" className="w-3 h-3" strokeWidth={2.4} />
-                  </button>
-                </span>
-              ))}
-              <input
-                id="card-tags"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === ",") {
-                    e.preventDefault();
-                    commitTag();
-                  } else if (e.key === "Backspace" && !tagInput && draft.tags.length) {
-                    set("tags", draft.tags.slice(0, -1));
-                  }
-                }}
-                onBlur={commitTag}
-                placeholder={draft.tags.length ? "" : "Type and press Enter"}
-                className="field flex-1 min-w-[10rem] h-8 py-0 text-xs"
-              />
-            </div>
-          </div>
         </div>
       )}
     </div>

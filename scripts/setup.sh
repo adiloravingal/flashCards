@@ -240,10 +240,11 @@ IP="$(lan_ip)"
 
 step "Ready"
 printf "\n  Start it:\n"
-printf "    %snpm run dev%s      %sfor working on it%s\n" "$BOLD" "$RESET" "$DIM" "$RESET"
 printf "    %snpm run build && npm start%s   %sfor everyday use%s\n" "$BOLD" "$RESET" "$DIM" "$RESET"
+printf "    %snpm run dev%s      %sfor working on it%s\n" "$BOLD" "$RESET" "$DIM" "$RESET"
 printf "\n  Then open:\n"
-printf "    http://localhost:3939\n"
+printf "    http://localhost:3939   %s(npm start)%s\n" "$DIM" "$RESET"
+printf "    http://localhost:3000   %s(npm run dev)%s\n" "$DIM" "$RESET"
 [ -n "$IP" ] && printf "    http://%s:3939   %s(from your phone or tablet, same network)%s\n" "$IP" "$DIM" "$RESET"
 
 printf "\n  %sFirst run creates your API key at data/agent-key.txt%s\n" "$DIM" "$RESET"

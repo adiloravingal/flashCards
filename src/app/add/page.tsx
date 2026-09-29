@@ -5,6 +5,7 @@ import { useState } from "react";
 import {
   CardForm,
   emptyDraft,
+  rememberTags,
   recallChapter,
   type CardDraft,
 } from "@/components/CardForm";
@@ -58,7 +59,9 @@ export default function AddPage() {
       const made = result.cards[0];
       if (made) setSession((s) => [{ front: made.front, id: made.id }, ...s]);
 
-      // Keep the chapter and the tags — consecutive cards usually share both.
+      // Keep the chapter and the tags — consecutive cards usually share both,
+      // and remembering them means a reload doesn't lose the run you're in.
+      rememberTags(draft.tags);
       setDraft({
         ...emptyDraft(draft.chapterId),
         tags: draft.tags,

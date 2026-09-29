@@ -727,6 +727,10 @@ FC_MAX_UPLOAD_MB=64`}</CodeBlock>
             <CodeBlock>{`npm run build
 npm start   # listens on port 3939`}</CodeBlock>
             <P>
+              <C>npm run dev</C> uses port 3000 instead, so you can work on the
+              code without taking down the copy you actually study from.
+            </P>
+            <P>
               A <C>Dockerfile</C> and <C>docker-compose.yml</C> are included if
               you&apos;d rather run it as a container — the <C>data/</C> folder is
               mounted as a volume so upgrades never touch your cards.

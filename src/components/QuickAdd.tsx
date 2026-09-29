@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, useHotkeys } from "@/lib/client";
 import type { Card } from "@/lib/types";
-import { CardForm, emptyDraft, recallChapter, type CardDraft } from "./CardForm";
+import {
+  CardForm,
+  emptyDraft,
+  recallChapter,
+  rememberTags,
+  type CardDraft,
+} from "./CardForm";
 import { Button, Modal, useToast } from "./ui";
 
 /**
@@ -76,7 +82,8 @@ export function QuickAdd() {
 
         if (keepOpen) {
           // Keep the chapter, clear everything else, refocus the front.
-          setDraft(emptyDraft(draft.chapterId));
+          rememberTags(draft.tags);
+          setDraft({ ...emptyDraft(draft.chapterId), tags: draft.tags });
           push(`Saved · ${next} this session`, "success");
         } else {
           setOpen(false);
