@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { apiFetch } from "@/lib/apiFetch";
+import { saveFile } from "@/lib/saveFile";
 import { api, cx } from "@/lib/client";
 import { Button, Icon, Modal, useToast } from "./ui";
 
@@ -60,15 +61,11 @@ export function BackupPanel() {
       const name =
         /filename="([^"]+)"/.exec(disposition)?.[1] ?? "flashcards.fcbackup";
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = decodeURIComponent(name);
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      push(`Backup saved · ${prettySize(blob.size)}`, "success");
+      const how = await saveFile(blob, decodeURIComponent(name));
+      push(
+        `${how === "shared" ? "Backup ready to send" : "Backup saved"} · ${prettySize(blob.size)}`,
+        "success",
+      );
     } catch (err) {
       push(err instanceof Error ? err.message : "Export failed", "error");
     } finally {

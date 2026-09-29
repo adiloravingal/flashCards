@@ -1,6 +1,7 @@
 "use client";
 
 import { apiFetch } from "@/lib/apiFetch";
+import { saveFile } from "@/lib/saveFile";
 
 import { useState } from "react";
 import { Button, Icon, useToast } from "./ui";
@@ -48,17 +49,11 @@ export function ExportDeckButton({
       const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "deck.fcdeck";
       const blob = await res.blob();
 
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = decodeURIComponent(filename);
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      // Revoke on the next tick so the download has definitely started.
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-      push("Deck saved — share the .fcdeck file", "success");
+      const how = await saveFile(blob, decodeURIComponent(filename));
+      push(
+        how === "shared" ? "Deck ready to send" : "Deck saved — share the .fcdeck file",
+        "success",
+      );
     } catch (err) {
       push(err instanceof Error ? err.message : "Export failed", "error");
     } finally {
