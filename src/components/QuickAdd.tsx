@@ -5,8 +5,8 @@ import { api, useHotkeys } from "@/lib/client";
 import type { Card } from "@/lib/types";
 import {
   CardForm,
+  defaultChapter,
   emptyDraft,
-  recallChapter,
   rememberTags,
   type CardDraft,
 } from "./CardForm";
@@ -28,7 +28,7 @@ export function QuickAdd() {
     {
       key: "n",
       run: () => {
-        setDraft(emptyDraft(recallChapter()));
+        setDraft(emptyDraft(defaultChapter()));
         setSavedCount(0);
         setOpen(true);
       },
@@ -36,8 +36,12 @@ export function QuickAdd() {
   ]);
 
   useEffect(() => {
-    const onOpen = () => {
-      setDraft(emptyDraft(recallChapter()));
+    // A caller that knows which chapter it means passes it; otherwise the
+    // chapter in the address bar wins, then the last one used.
+    const onOpen = (e: Event) => {
+      const wanted = (e as CustomEvent<{ chapterId?: string } | undefined>).detail
+        ?.chapterId;
+      setDraft(emptyDraft(defaultChapter(wanted)));
       setSavedCount(0);
       setOpen(true);
     };

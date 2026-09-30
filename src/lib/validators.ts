@@ -91,6 +91,11 @@ export const cardUpdate = z.object({
   mediaIds: z.array(mediaRef).max(20).optional(),
 });
 
+export const cardsMove = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(1000),
+  chapterId: z.string().min(1),
+});
+
 export const answerBody = z.object({
   cardId: z.string().min(1),
   rating: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { CardForm, draftFromCard, type CardDraft } from "@/components/CardForm";
 import {
   Badge,
@@ -50,6 +50,74 @@ function ChapterDetailView() {
   );
   const [confirmDelete, setConfirmDelete] = useState<Card | null>(null);
   const { push } = useToast();
+
+  /* ------------------------------------------------------------------ *
+   * Selecting cards, to move them somewhere else
+   *
+   * Cards land in the wrong chapter easily — the form carries the last one
+   * over — so getting them out again has to be cheaper than re-typing them.
+   * Selection appears only once you tick something: an empty list looks
+   * exactly as it did before.
+   * ------------------------------------------------------------------ */
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [movingTo, setMovingTo] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const lastTicked = useRef<string | null>(null);
+
+  const siblings = useApi<Chapter[]>(
+    courseId ? `/chapters?courseId=${courseId}` : null,
+  );
+
+  const toggle = (card: Card, index: number, withShift: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const list = cards.data?.cards ?? [];
+
+      // Shift-click takes the run between the last tick and this one, which is
+      // the whole point when a mis-filed batch sits together in the list.
+      if (withShift && lastTicked.current) {
+        const from = list.findIndex((c) => c.id === lastTicked.current);
+        if (from !== -1) {
+          const [a, b] = from < index ? [from, index] : [index, from];
+          const adding = !prev.has(card.id);
+          for (let i = a; i <= b; i++) {
+            if (adding) next.add(list[i].id);
+            else next.delete(list[i].id);
+          }
+          lastTicked.current = card.id;
+          return next;
+        }
+      }
+
+      if (next.has(card.id)) next.delete(card.id);
+      else next.add(card.id);
+      lastTicked.current = card.id;
+      return next;
+    });
+  };
+
+  const moveSelected = async (targetId: string) => {
+    setMoving(true);
+    try {
+      const result = await api<{ moved: number; chapterName: string }>(
+        "/cards/move",
+        { method: "POST", json: { ids: [...selected], chapterId: targetId } },
+      );
+      setMovingTo(false);
+      setSelected(new Set());
+      lastTicked.current = null;
+      await Promise.all([cards.reload(), chapter.reload()]);
+      window.dispatchEvent(new CustomEvent("fc:data-changed"));
+      push(
+        `Moved ${result.moved} card${result.moved === 1 ? "" : "s"} to ${result.chapterName}`,
+        "success",
+      );
+    } catch (err) {
+      push(err instanceof Error ? err.message : "Could not move", "error");
+    } finally {
+      setMoving(false);
+    }
+  };
 
   const saveEdit = async () => {
     if (!editing) return;
@@ -141,7 +209,11 @@ function ChapterDetailView() {
         actions={
           <>
             <Button
-              onClick={() => window.dispatchEvent(new CustomEvent("fc:quick-add"))}
+              onClick={() =>
+                window.dispatchEvent(
+                  new CustomEvent("fc:quick-add", { detail: { chapterId } }),
+                )
+              }
             >
               <Icon name="plus" className="w-4 h-4" />
               Card
@@ -179,6 +251,30 @@ function ChapterDetailView() {
         </div>
       )}
 
+      {selected.size > 0 && (
+        <Panel className="sticky top-3 z-20 mb-3 px-3.5 py-2.5 flex flex-wrap items-center gap-2 anim-fade border-[var(--accent)] bg-[var(--surface)]">
+          <span className="text-sm font-medium">
+            {selected.size} selected
+          </span>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set(list.map((c) => c.id)))}
+            className="text-xs text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+          >
+            Select all {list.length}
+          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+              Clear
+            </Button>
+            <Button size="sm" variant="primary" onClick={() => setMovingTo(true)}>
+              <Icon name="archive" className="w-3.5 h-3.5" />
+              Move to chapter
+            </Button>
+          </div>
+        </Panel>
+      )}
+
       {cards.loading && !cards.data ? (
         <div className="grid place-items-center py-24">
           <Spinner className="w-6 h-6 text-[var(--text-faint)]" />
@@ -191,7 +287,11 @@ function ChapterDetailView() {
           action={
             <Button
               variant="primary"
-              onClick={() => window.dispatchEvent(new CustomEvent("fc:quick-add"))}
+              onClick={() =>
+                window.dispatchEvent(
+                  new CustomEvent("fc:quick-add", { detail: { chapterId } }),
+                )
+              }
             >
               Write a card
             </Button>
@@ -199,15 +299,32 @@ function ChapterDetailView() {
         />
       ) : (
         <div className="space-y-1.5 anim-fade-up">
-          {list.map((card) => (
+          {list.map((card, index) => (
             <Panel
               key={card.id}
               className={cx(
                 "p-3.5 group transition-colors hover:border-[var(--border-strong)]",
                 card.suspended && "opacity-55",
+                selected.has(card.id) && "border-[var(--accent)] bg-[var(--accent-soft)]",
               )}
             >
               <div className="flex items-start gap-4">
+                <input
+                  type="checkbox"
+                  checked={selected.has(card.id)}
+                  onChange={(e) =>
+                    toggle(card, index, (e.nativeEvent as MouseEvent).shiftKey)
+                  }
+                  aria-label={`Select card ${index + 1}`}
+                  title="Shift-click to select a run"
+                  className={cx(
+                    "mt-0.5 w-4 h-4 shrink-0 accent-[var(--accent)] cursor-pointer transition-opacity",
+                    // Out of the way until it is useful, then it stays put.
+                    selected.size > 0
+                      ? "opacity-100"
+                      : "opacity-0 group-hover:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100",
+                  )}
+                />
                 <div className="min-w-0 grow">
                   <div className="flex items-start gap-2">
                     {card.starred > 0 && (
@@ -287,6 +404,54 @@ function ChapterDetailView() {
           ))}
         </div>
       )}
+
+      <Modal
+        open={movingTo}
+        onClose={() => setMovingTo(false)}
+        title={`Move ${selected.size} card${selected.size === 1 ? "" : "s"} to…`}
+      >
+        {(() => {
+          const others = (siblings.data ?? []).filter((c) => c.id !== chapterId);
+          if (siblings.loading && !siblings.data) {
+            return (
+              <div className="grid place-items-center py-8">
+                <Spinner className="w-5 h-5 text-[var(--text-faint)]" />
+              </div>
+            );
+          }
+          if (others.length === 0) {
+            return (
+              <p className="text-sm text-[var(--text-muted)] py-2">
+                This course has no other chapter yet. Make one from the course
+                page, then move these across.
+              </p>
+            );
+          }
+          return (
+            <div className="space-y-1.5">
+              {others.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  disabled={moving}
+                  onClick={() => void moveSelected(c.id)}
+                  className={cx(
+                    "w-full text-left px-3.5 py-3 rounded-[var(--radius)] border transition-colors",
+                    "border-[var(--border)] hover:border-[var(--accent)] hover:bg-[var(--surface-2)]",
+                    "disabled:opacity-50 disabled:pointer-events-none",
+                  )}
+                >
+                  <span className="text-sm font-medium">{c.name}</span>
+                </button>
+              ))}
+              <p className="text-xs text-[var(--text-faint)] pt-2">
+                Review history moves with the cards. Cloze siblings travel
+                together, since they are one note.
+              </p>
+            </div>
+          );
+        })()}
+      </Modal>
 
       <RenameDialog
         open={renamingChapter}

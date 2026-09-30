@@ -72,6 +72,28 @@ export const recallChapter = (): string => {
 };
 
 /**
+ * The chapter you are looking at beats the one you used last.
+ *
+ * Carrying the last chapter over is right when you are writing cards from
+ * nowhere in particular, and wrong the moment you have opened a chapter and
+ * pressed Card — at that point you have already said where the card goes, and
+ * silently filing it somewhere else is how a run of cards ends up in the wrong
+ * place without anyone noticing.
+ */
+export const chapterInView = (): string => {
+  try {
+    const url = new URL(window.location.href);
+    return url.pathname === "/chapter" ? (url.searchParams.get("id") ?? "") : "";
+  } catch {
+    return "";
+  }
+};
+
+/** Where a new card should go by default, most specific answer first. */
+export const defaultChapter = (explicit?: string): string =>
+  explicit || chapterInView() || recallChapter();
+
+/**
  * Tags carry over to the next card, and across reloads.
  *
  * Cards get written in runs — twenty on one topic, then twenty on another —

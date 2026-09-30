@@ -542,6 +542,67 @@ export function updateCard(
  * and therefore its schedule. Rewriting a typo in c1 must not cost you the
  * three months of review history attached to c2.
  */
+/**
+ * Move a set of cards into another chapter.
+ *
+ * Filing a run of cards under the wrong chapter is easy to do and, one card at
+ * a time, tedious to undo — so this is a single transaction and a single line
+ * in the activity log rather than N of each.
+ *
+ * Cloze siblings travel together. They are one note showing several faces, and
+ * leaving half of them behind would split a note across two chapters, which
+ * nothing else in the app expects.
+ */
+export function moveCards(
+  ids: string[],
+  chapterId: string,
+  actor: Actor,
+): { moved: number; chapter: Chapter } {
+  const db = getDb();
+  const chapter = getChapter(chapterId);
+  if (!chapter) throw new Error("No chapter with that id.");
+
+  const moved = db.transaction(() => {
+    const ts = now();
+    const seen = new Set<string>();
+    let n = 0;
+
+    for (const id of ids) {
+      const row = db.prepare("SELECT * FROM cards WHERE id = ?").get(id) as
+        | CardRow
+        | undefined;
+      if (!row) continue;
+
+      // One note may be selected through several of its cards.
+      const noteId = row.note_id || row.id;
+      if (seen.has(noteId)) continue;
+      seen.add(noteId);
+
+      // Counting the rows the UPDATE actually touched: a cloze note selected
+      // once moves all of its siblings, and the number reported should be what
+      // moved, not how many rows were ticked.
+      const { changes } = db
+        .prepare(
+          "UPDATE cards SET chapter_id = ?, updated_at = ? WHERE (note_id = ? OR id = ?) AND chapter_id != ?",
+        )
+        .run(chapterId, ts, noteId, id, chapterId);
+      n += changes;
+    }
+
+    return n;
+  })();
+
+  logEvent({
+    actor,
+    action: "card.move",
+    entityType: "chapter",
+    entityId: chapterId,
+    summary: `Moved ${moved} card${moved === 1 ? "" : "s"} to “${chapter.name}”`,
+  });
+
+  return { moved, chapter };
+}
+
 function updateClozeNote(
   existing: CardRow,
   patch: Partial<CardInput> & { position?: number },

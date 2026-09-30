@@ -28,6 +28,7 @@ const SECTIONS = [
   { id: "anki", label: "Importing Anki decks" },
   { id: "media", label: "Images, audio & files" },
   { id: "occlusion", label: "Blocking parts of an image out" },
+  { id: "moving", label: "Moving cards between chapters" },
   { id: "scheduling", label: "How scheduling works" },
   { id: "agents", label: "AI agent access" },
   { id: "data", label: "Your data & backups" },
@@ -218,6 +219,15 @@ export default function DocsPage() {
                 </>,
               ]}
             />
+            <P>
+              The chapter picker at the top defaults to{" "}
+              <B>the chapter you are looking at</B> when you add from inside
+              one, and otherwise to the last chapter you wrote into — so a run
+              of cards needs the picker touched once, if at all. It is always
+              visible, and it is worth a glance before a long run. If a batch
+              does end up in the wrong place, see{" "}
+              <B>Moving cards between chapters</B>.
+            </P>
             <Callout>
               One fact per card. If the back has a comma-separated list in it,
               it&apos;s usually two or three cards wearing a trench coat — and
@@ -615,6 +625,46 @@ export default function DocsPage() {
                 </>,
               ]}
             />
+          </Doc>
+
+          <Doc id="moving" title="Moving cards between chapters">
+            <P>
+              Open the chapter the cards are in and tick the ones you want.
+              Hovering a card shows its checkbox; once anything is ticked, all
+              of them stay visible and a bar appears at the top with{" "}
+              <B>Move to chapter</B>. Pick the destination and they go.
+            </P>
+            <List
+              items={[
+                <>
+                  <B>Shift-click</B> ticks everything between the last card you
+                  ticked and this one — which is what you want when a
+                  mis-filed batch sits together in the list.
+                </>,
+                <>
+                  <B>Select all</B> in the bar takes the whole chapter.
+                </>,
+                <>
+                  <B>Review history moves with the cards.</B> Due dates,
+                  difficulty, lapses and streak all survive — moving a card is
+                  filing it, not rewriting it.
+                </>,
+                <>
+                  <B>Cloze siblings travel together.</B> Ticking one face of a
+                  cloze note moves every card made from it, because they are one
+                  note and nothing else in the app expects them split up.
+                </>,
+                <>
+                  <B>It is one entry in Activity</B>, not one per card, so a
+                  large tidy-up stays readable in your history.
+                </>,
+              ]}
+            />
+            <Callout>
+              Cards are moved <B>within a course</B> — the dialog lists that
+              course&apos;s other chapters. To move cards to a different course,
+              export the chapter as a deck and import it there.
+            </Callout>
           </Doc>
 
           <Doc id="scheduling" title="How scheduling works">
